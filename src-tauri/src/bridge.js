@@ -109,14 +109,14 @@
   const ensureChip = () => {
     if (chip) return;
     chip = document.createElement('kimi-lite-chip');
-    chip.style.cssText = 'position:fixed;top:12px;left:0;z-index:2147483646;display:none;cursor:pointer;';
+    chip.style.cssText = 'position:fixed;top:12px;left:0;z-index:2147483646;display:none;';
     chipRoot = chip.attachShadow({ mode: 'closed' });
     chipRoot.innerHTML = `
       <style>
         :host { all: initial; }
         button {
           display: flex; align-items: center; gap: 6px; height: 24px; max-width: 100%;
-          padding: 0 6px 0 8px; border: 0; border-radius: 6px; background: transparent; cursor: pointer;
+          padding: 0 6px 0 8px; border: 0; border-radius: 6px; background: transparent; cursor: default;
           font: 500 12.5px/1 var(--font-ui, "Schibsted Grotesk Variable", -apple-system, system-ui, sans-serif);
           color: var(--color-text-muted, rgba(0,0,0,.6));
         }
@@ -209,6 +209,62 @@
     };
   }
 
+  // ---- Arrow cursor, like a native app ---------------------------------------
+  // Kimi's stylesheets (same-origin) are rewritten once: `cursor: pointer`
+  // becomes `default`. The rewritten selectors are remembered, since they
+  // also tell the drag strip what is clickable. Links in prose keep the hand.
+  let pointerSelector = '';
+  const pointerSelectors = new Set();
+  const patchedSheets = new WeakSet();
+  const patchRules = (rules) => {
+    for (const rule of rules) {
+      if (rule.cssRules && rule.cssRules.length) patchRules(rule.cssRules);
+      if (!rule.style || rule.style.getPropertyValue('cursor') !== 'pointer') continue;
+      rule.style.setProperty('cursor', 'default', rule.style.getPropertyPriority('cursor'));
+      if (rule.selectorText) pointerSelectors.add(rule.selectorText.replace(/::?(before|after|marker|placeholder)\b/g, ''));
+    }
+  };
+  const patchSheets = () => {
+    for (const sheet of document.styleSheets) {
+      if (patchedSheets.has(sheet) || sheet.ownerNode?.id?.startsWith('kl-')) continue;
+      try {
+        patchRules(sheet.cssRules);
+        patchedSheets.add(sheet);
+      } catch {}
+    }
+    pointerSelector = [...pointerSelectors]
+      .filter((selector) => {
+        try {
+          document.documentElement.matches(selector);
+          return true;
+        } catch {
+          return false;
+        }
+      })
+      .join(',');
+  };
+  const PROSE_LINKS = `
+    :is(p, li, td, blockquote) a[href] { cursor: pointer; }`;
+  const startCursorPatch = () => {
+    const style = document.createElement('style');
+    style.id = 'kl-cursor-style';
+    style.textContent = PROSE_LINKS;
+    (document.head || document.documentElement).appendChild(style);
+    patchSheets();
+    // Vite loads CSS chunks on demand: patch each new stylesheet once loaded.
+    new MutationObserver((records) => {
+      for (const record of records) {
+        for (const node of record.addedNodes) {
+          if (node.nodeName === 'LINK') node.addEventListener('load', patchSheets, { once: true });
+          else if (node.nodeName === 'STYLE') patchSheets();
+        }
+      }
+    }).observe(document.head || document.documentElement, { childList: true });
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startCursorPatch, { once: true });
+  else startCursorPatch();
+  window.addEventListener('load', patchSheets, { once: true });
+
   // ---- Window dragging from the top strip (no -webkit-app-region here) ----
   if (config.dragStrip) {
     const INTERACTIVE =
@@ -220,6 +276,7 @@
       if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return false;
       const target = event.target;
       if (!(target instanceof Element) || target.closest(INTERACTIVE)) return false;
+      if (pointerSelector && target.closest(pointerSelector)) return false;
       const cursor = getComputedStyle(target).cursor;
       return cursor === 'auto' || cursor === 'default';
     };
@@ -273,7 +330,7 @@
         .msg { white-space:nowrap; max-width:60vw; overflow:hidden; text-overflow:ellipsis; }
         .muted { color: var(--color-text-faint, rgba(0,0,0,.45)); font-variant-numeric: tabular-nums; }
         button {
-          font: inherit; color: inherit; cursor: pointer; height: 24px;
+          font: inherit; color: inherit; cursor: default; height: 24px;
           background: var(--color-surface-sunken, #f5f5f5); border: .5px solid var(--color-line-strong, rgba(0,0,0,.15));
           border-radius: 999px; padding: 0 10px;
         }

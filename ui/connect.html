@@ -20,7 +20,7 @@
       .failed .bar, .stopped .bar { display: none; }
       .failed .actions, .stopped .actions { display: flex; }
       details { width: 100%; margin-top: 28px; text-align: left; }
-      summary { color: var(--color-text-faint); font-size: var(--text-xs); cursor: pointer; list-style: none; text-align: center; }
+      summary { color: var(--color-text-faint); font-size: var(--text-xs); list-style: none; text-align: center; }
       summary::-webkit-details-marker { display: none; }
       summary:hover { color: var(--color-text-muted); }
       .log { margin-top: 10px; max-height: 220px; }
@@ -67,7 +67,11 @@
       $('retry').onclick = () => invoke('host_action', { id, action: 'retry' });
       $('edit').onclick = () => invoke('show_hosts', { focus: id });
       listen('host-status', (event) => render(event.payload));
-      invoke('host_status', { id }).then(render);
+      invoke('host_status', { id }).then((status) => {
+        render(status);
+        // Landed here while connected (e.g. via history): bring Kimi back.
+        if (status?.phase === 'ready') invoke('host_action', { id, action: 'show' });
+      });
     </script>
   </body>
 </html>

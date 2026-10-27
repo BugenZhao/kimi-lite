@@ -423,16 +423,25 @@ impl Ctx {
         if same_origin {
             let _ = window.eval("window.__kd ? window.__kd.reconnected() : location.reload()");
         } else {
-            let _ = window.navigate(url.clone());
+            replace_location(&window, url);
         }
     }
 
     fn show_connect_page(&self) {
         if let Some(window) = self.window() {
             if let Some(url) = crate::connect_page_url(&self.id) {
-                let _ = window.navigate(url);
+                replace_location(&window, &url);
             }
         }
+    }
+}
+
+/// Swaps pages without adding history: a Back gesture (or a page router
+/// popping state) must never land on the connection screen.
+fn replace_location(window: &tauri::WebviewWindow, url: &Url) {
+    let target = serde_json::to_string(url.as_str()).unwrap_or_default();
+    if window.eval(format!("location.replace({target})")).is_err() {
+        let _ = window.navigate(url.clone());
     }
 }
 

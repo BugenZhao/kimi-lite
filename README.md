@@ -10,7 +10,7 @@ A lightweight native shell for [Kimi Code](https://github.com/MoonshotAI/kimi-co
 - **Fast failure detection.** The app owns an SSH master connection (`ssh -M`). If it exits, the app knows immediately. A `GET /` health probe every 5s (plus wake-from-sleep detection) catches everything else. Backoff is 1, 2, 3, 5, 10, 20, then 30s, forever, with *Retry now* in a small banner.
 - **One SSH login per connect.** Scripts and port forwards share the master. On macOS, password, passphrase and host-key prompts appear as native dialogs (`SSH_ASKPASS`).
 - **Native bits.** Real menu bar, Edit menu (copy/paste), zoom, file drops into the page, native notifications (with a Dock badge while the app is in the background), downloads to `~/Downloads`, external links in the default browser, and windows restored on relaunch.
-- **Glass and native styling.** On macOS the sidebar sits on the system's frosted-glass material, as in the official app. The Hosts window, connection screen and reconnect banner use Kimi's own font (Schibsted Grotesk), grays, buttons and switches, so they read as part of Kimi.
+- **Glass and native styling.** On macOS the sidebar sits on the system's frosted-glass material, as in the official app. The Hosts window, connection screen and reconnect banner use Kimi's own font (Schibsted Grotesk), grays, buttons and switches, so they read as part of Kimi. Controls use the arrow cursor like a native app (links in message text keep the hand): Kimi's own `cursor: pointer` rules are rewritten once as its stylesheets load.
 - **Onboarding once.** Each host is its own origin, so Kimi would show its welcome screens for every new host. After you finish them once, every host is told so.
 - **Small.** The release bundle is about 6 MB (it uses the system WebView instead of bundling Chromium).
 
@@ -25,6 +25,7 @@ Kimi Code moves fast, so the app relies on as little of it as possible.
 | `new Notification(...)`, the `online` event | Web standards |
 | `?kimi_desktop=1&platform=…&kimi_vibrancy=1&kimi_onboarded=1`, optional `window.kimiDesktop` hooks (`onMenuAction`, `showWindow`, `setTheme`, `get/setVibrancy`, `setOnboarded`) | Opt-in, degrades to plain web mode |
 | Frosted sidebar shim: `--color-sidebar-bg` and the page/`#app`/`.app` backgrounds go transparent | Cosmetic; falls back to an opaque sidebar if the markup changes |
+| Arrow cursor: rewrites `cursor: pointer` in Kimi's same-origin stylesheets | Cosmetic; no class names involved |
 
 The app does **not** read `~/.kimi-code` internals (server registry, tokens), call private API routes, or reach into the page's framework state. Servers are tracked with a pidfile and log the app owns, under `${XDG_STATE_HOME:-~/.local/state}/kimi-lite/` on each host.
 

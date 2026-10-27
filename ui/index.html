@@ -8,58 +8,59 @@
     <style>
       body { display: flex; background: transparent; overflow: hidden; }
 
-      /* Sidebar sits on the window's glass, like Kimi's own sidebar. */
-      aside { width: 232px; flex: none; display: flex; flex-direction: column; padding: 48px 8px 10px; }
+      /* Sidebar on the window's glass; rows styled like the tabs of Kimi's
+         settings dialog. */
+      aside { width: 220px; flex: none; display: flex; flex-direction: column; padding: 48px 8px 10px; }
       .side-action, li {
-        display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 10px;
-        border: 0; border-radius: var(--radius-sm); background: transparent; width: 100%;
-        font-size: var(--text-sm); color: var(--color-text); text-align: left; cursor: pointer;
+        display: flex; align-items: center; gap: 8px; padding: 8px 10px; width: 100%;
+        border: 0; border-radius: var(--radius-md); background: transparent;
+        color: var(--color-text-muted); font: 500 var(--text-sm)/1.25 var(--font-ui); text-align: left;
+        transition: background var(--duration) var(--ease-out), color var(--duration) var(--ease-out);
       }
-      .side-action:hover, li:hover { background: var(--color-hover); }
-      .side-action.selected, li.selected { background: var(--color-selected); }
+      .side-action:hover, li:hover { background: var(--color-hover); color: var(--color-text); }
+      .side-action.selected, li.selected { background: var(--color-selected); color: var(--color-text); }
       .side-action svg, li .glyph { width: 16px; height: 16px; flex: none; color: var(--color-text-muted); }
-      .section { font-size: 12px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-text-faint); padding: 14px 10px 6px; }
-      ul { list-style: none; margin: 0; padding: 0; flex: 1; overflow: auto; }
-      li { margin-bottom: 1px; }
+      .section { font-size: 12px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-text-faint); padding: 16px 10px 6px; }
+      ul { list-style: none; margin: 0; padding: 0; flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 2px; }
       li.dragging { opacity: 0.4; }
       li.drop-before { box-shadow: inset 0 2px 0 var(--color-accent); }
       li .name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      li .meta { font-size: var(--text-xs); color: var(--color-text-faint); white-space: nowrap; }
 
-      /* Detail pane: opaque, like Kimi's main pane. */
-      section.detail { flex: 1; min-width: 0; background: var(--bg); overflow: auto; padding: 44px 40px 32px; }
-      .head { display: flex; align-items: center; gap: 12px; }
-      .head .glyph { width: 36px; height: 36px; padding: 8px; border-radius: var(--radius-md); background: var(--color-surface-sunken); color: var(--color-text-muted); flex: none; }
-      .head h1 { font-size: 20px; font-weight: 600; margin: 0; letter-spacing: -0.01em; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .state { display: flex; align-items: center; gap: 8px; color: var(--color-text-muted); font-size: var(--text-sm); margin: 10px 0 18px; min-height: 20px; }
-      .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+      /* Content pane: opaque, laid out like the body of Kimi's settings. */
+      section.detail { flex: 1; min-width: 0; background: var(--bg); overflow: auto; padding: 40px 32px 24px; }
+      .detail > div { max-width: 600px; }
+      .panel-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
+      .panel-head .glyph { width: 32px; height: 32px; padding: 7px; border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text-muted); flex: none; }
+      .panel-head .text { flex: 1; min-width: 0; }
+      .panel-title { margin: 0 0 2px; font-size: var(--text-base); font-weight: 500; color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .panel-desc { margin: 0; display: flex; align-items: center; gap: 6px; font-size: var(--text-xs); line-height: 1.5; color: var(--color-text-muted); }
+      .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 
-      /* Settings rows, as in Kimi's settings dialog. */
-      .card { border: var(--hairline) solid var(--color-line); border-radius: var(--radius-lg); background: var(--color-surface-raised); max-width: 640px; }
-      .row { display: flex; align-items: center; gap: 24px; padding: 14px 16px; min-height: 56px; }
+      .sec { padding: 16px 0 0; }
+      .sec-title { margin: 0 0 12px; font-size: var(--text-base); font-weight: 500; color: var(--color-text); }
+      .group { overflow: hidden; border-radius: var(--radius-xl); background: var(--color-surface); }
+      .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 16px; }
       .row + .row { border-top: var(--hairline) solid var(--color-line); }
       .row .text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-      .row .label { font-size: var(--text-sm); font-weight: 500; }
-      .row .hint { font-size: var(--text-xs); color: var(--color-text-faint); line-height: 1.45; }
+      .row .label { font-size: var(--text-base); color: var(--color-text); }
+      .row .hint { font-size: var(--text-xs); line-height: 1.5; color: var(--color-text-faint); }
       .row .control { width: 220px; flex: none; display: flex; justify-content: flex-end; }
       .row .control:has(.switch) { width: auto; }
-      .group-title { font-size: 12px; font-weight: 500; color: var(--color-text-faint); margin: 24px 0 8px 4px; }
-      .group-title:first-of-type { margin-top: 0; }
-      .footer { display: flex; align-items: center; gap: 8px; max-width: 640px; margin-top: 16px; }
+      .footer { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
       .footer .spacer { flex: 1; }
       .swatches { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
       .swatch {
-        width: 18px; height: 18px; border-radius: 50%; border: 0; padding: 0; cursor: pointer;
+        width: 18px; height: 18px; border-radius: 50%; border: 0; padding: 0;
         background: var(--c); box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.12);
         transition: transform var(--duration) var(--ease-out);
       }
       .swatch:hover { transform: scale(1.12); }
-      .swatch.none { background: transparent; box-shadow: inset 0 0 0 1px var(--color-line-strong); position: relative; }
+      .swatch.none { background: var(--color-surface-raised); box-shadow: inset 0 0 0 1px var(--color-line-strong); position: relative; }
       .swatch.none::after { content: ""; position: absolute; left: 3px; right: 3px; top: 8.5px; height: 1px; background: var(--color-text-quaternary); transform: rotate(-45deg); }
-      .swatch.selected { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--c, var(--color-line-strong)); }
+      .swatch.selected { box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 3.5px var(--c, var(--color-line-strong)); }
       .error { color: var(--color-danger); font-size: var(--text-xs); }
       .error:empty { display: none; }
-      .prose { color: var(--color-text-faint); font-size: var(--text-xs); max-width: 640px; margin: 16px 4px 0; line-height: 1.55; }
+      .prose { color: var(--color-text-faint); font-size: var(--text-xs); margin: 12px 4px 0; line-height: 1.55; }
     </style>
   </head>
   <body>
@@ -78,11 +79,13 @@
 
     <section class="detail">
       <div id="host-view" hidden>
-        <div class="head">
+        <div class="panel-head">
           <span class="glyph" id="head-glyph"></span>
-          <h1 id="head-name"></h1>
+          <div class="text">
+            <h2 class="panel-title" id="head-name"></h2>
+            <p class="panel-desc"><span class="dot" id="state-dot"></span><span id="state-text"></span></p>
+          </div>
         </div>
-        <div class="state"><span class="dot" id="state-dot"></span><span id="state-text"></span></div>
         <div class="actions" id="actions">
           <button class="btn primary" id="open">Open</button>
           <button class="btn" id="reconnect" hidden>Reconnect</button>
@@ -91,8 +94,9 @@
         </div>
 
         <form id="form" autocomplete="off" spellcheck="false">
-          <div class="group-title">Connection</div>
-          <div class="card">
+          <div class="sec">
+          <h3 class="sec-title">Connection</h3>
+          <div class="group">
             <div class="row">
               <div class="text"><span class="label">Name</span><span class="hint">Shown in the Window menu and title.</span></div>
               <div class="control"><input class="input" type="text" id="f-name" required /></div>
@@ -111,12 +115,15 @@
             </div>
           </div>
 
-          <div class="group-title">Agent</div>
-          <div class="card">
+          </div>
+          <div class="sec">
+          <h3 class="sec-title">Agent</h3>
+          <div class="group">
             <div class="row">
               <div class="text"><span class="label">Hide GPUs</span><span class="hint">Agents see no local GPUs and must request them through Slurm (srun / sbatch --gres=gpu:N).</span></div>
               <div class="control"><input class="switch" type="checkbox" id="f-gpus" /></div>
             </div>
+          </div>
           </div>
 
           <div class="footer">
@@ -129,10 +136,15 @@
       </div>
 
       <div id="settings-view" hidden>
-        <div class="head"><h1>Settings</h1></div>
-        <div class="state"></div>
-        <div class="group-title">Appearance</div>
-        <div class="card">
+        <div class="panel-head">
+          <div class="text">
+            <h2 class="panel-title">Settings</h2>
+            <p class="panel-desc">How Kimi Lite presents Kimi Code.</p>
+          </div>
+        </div>
+        <div class="sec">
+        <h3 class="sec-title">Appearance</h3>
+        <div class="group">
           <div class="row">
             <div class="text"><span class="label">Seamless title bar</span><span class="hint">Use Kimi Code's built-in desktop layout, with its header in the title bar. Turn off to show the plain web UI under a standard title bar.</span></div>
             <div class="control"><input class="switch" type="checkbox" id="s-integration" /></div>
@@ -141,6 +153,7 @@
             <div class="text"><span class="label">Frosted sidebar</span><span class="hint">Use the native macOS glass material behind Kimi's sidebar.</span></div>
             <div class="control"><input class="switch" type="checkbox" id="s-vibrancy" /></div>
           </div>
+        </div>
         </div>
         <p class="prose">
           Kimi Code keeps running on each host after its window closes or the connection drops, so agents keep working.

@@ -373,7 +373,7 @@ fn host_status(state: tauri::State<AppState>, id: String) -> Option<HostStatus> 
 #[tauri::command]
 fn host_action(app: AppHandle, id: String, action: String) -> Result<(), String> {
     let command = match action.as_str() {
-        "retry" => Command::Retry,
+        "retry" | "show" => Command::Retry,
         "restart" => Command::Restart,
         "stop" => Command::Stop,
         _ => return Err("Unknown action.".into()),
