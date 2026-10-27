@@ -321,12 +321,30 @@ fn askpass() -> Option<PathBuf> {
     ASKPASS.get().cloned().flatten()
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Probe {
+    Healthy,
+    /// Nothing is listening at all.
+    Refused,
+    /// Listening, but no good answer (yet).
+    Unhealthy,
+}
+
 /// `GET /` over plain TCP: the cheapest end-to-end check through the tunnel
 /// that does not depend on any Kimi API route.
 pub async fn probe(port: u16) -> bool {
+    probe_detailed(port).await == Probe::Healthy
+}
+
+pub async fn probe_detailed(port: u16) -> Probe {
     use tokio::io::AsyncReadExt;
-    let attempt = async {
-        let mut stream = tokio::net::TcpStream::connect(("127.0.0.1", port)).await.ok()?;
+    let stream = match tokio::net::TcpStream::connect(("127.0.0.1", port)).await {
+        Ok(stream) => stream,
+        Err(e) if e.kind() == std::io::ErrorKind::ConnectionRefused => return Probe::Refused,
+        Err(_) => return Probe::Unhealthy,
+    };
+    let attempt = async move {
+        let mut stream = stream;
         let request = format!("GET / HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n");
         stream.write_all(request.as_bytes()).await.ok()?;
         let mut head = [0u8; 16];
@@ -341,7 +359,10 @@ pub async fn probe(port: u16) -> bool {
         let head = std::str::from_utf8(&head[..read]).ok()?;
         Some(head.starts_with("HTTP/1.") && head[8..].trim_start().starts_with('2'))
     };
-    tokio::time::timeout(Duration::from_secs(5), attempt).await.ok().flatten().unwrap_or(false)
+    match tokio::time::timeout(Duration::from_secs(5), attempt).await {
+        Ok(Some(true)) => Probe::Healthy,
+        _ => Probe::Unhealthy,
+    }
 }
 
 pub fn free_port() -> Option<u16> {

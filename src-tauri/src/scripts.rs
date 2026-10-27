@@ -51,6 +51,10 @@ alive() {{
   recorded="$(sed -n 2p "$pidf" 2>/dev/null)"
   [ -z "$recorded" ] || [ "$recorded" = "$(started_at "$pid")" ]
 }}
+# Listening sockets only (netstat -an also lists TIME_WAIT and friends).
+listening() {{
+  {{ ss -ltn 2>/dev/null || netstat -an 2>/dev/null | grep -i listen || lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null; }} | grep -Eq "[:.]$1[[:space:]]"
+}}
 stop_server() {{
   if alive; then
     kill "$pid" 2>/dev/null
@@ -86,8 +90,10 @@ done"#
 {restart}
 if alive; then
   u="$(url_of)"
-  if [ -n "$u" ]; then echo "{READY} $pid $u"; exit 0; fi
-  # Alive but its URL is unknown (log rotated away): start over.
+  p="$(printf '%s' "$u" | sed -E 's#^.*:([0-9]+)/.*$#\1#')"
+  # After SIGTERM Kimi closes its socket but may linger for a long time:
+  # only a server that still listens is worth reusing.
+  if [ -n "$u" ] && listening "$p"; then echo "{READY} $pid $u"; exit 0; fi
   stop_server
 fi
 {lookup}
@@ -95,9 +101,6 @@ if [ -z "$bin" ] || [ ! -x "$bin" ]; then
   echo "{ERROR} Could not find '{command}' on PATH or in ~/.kimi-code/bin. Install Kimi Code on this machine first."
   exit 127
 fi
-listening() {{
-  {{ ss -ltn 2>/dev/null || netstat -an 2>/dev/null || lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null; }} | grep -Eq "[:.]$1[[:space:]]"
-}}
 port={preferred_port}
 i=0
 while [ $i -lt 50 ] && listening "$port"; do port=$((port + 1)); i=$((i + 1)); done

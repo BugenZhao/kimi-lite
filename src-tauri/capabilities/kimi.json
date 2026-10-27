@@ -9,6 +9,8 @@
     "core:window:allow-start-dragging",
     "core:window:allow-internal-toggle-maximize",
     "allow-kd-set-theme",
+    "allow-kd-set-vibrancy",
+    "allow-kd-set-onboarded",
     "allow-kd-show-window",
     "allow-kd-notify",
     "allow-kd-retry"

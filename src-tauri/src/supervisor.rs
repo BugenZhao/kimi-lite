@@ -245,8 +245,8 @@ impl Runner {
 
     /// Shows the host and watches it until something goes wrong.
     async fn serve(&mut self, mut connection: Connection) -> Exit {
-        let integrated = self.ctx.app.state::<AppState>().store.lock().unwrap().settings.desktop_integration;
-        let url = kimi_url(connection.port, &connection.token, integrated);
+        let settings = self.ctx.app.state::<AppState>().store.lock().unwrap().settings.clone();
+        let url = kimi_url(connection.port, &connection.token, &settings);
         self.ctx.log(&format!("Serving on 127.0.0.1:{}", connection.port));
         self.ctx.update(|s| {
             s.phase = Phase::Ready;
@@ -366,11 +366,20 @@ impl Ctx {
         };
         self.app.state::<AppState>().store.lock().unwrap().set_local_port(&host.id, port);
 
-        // A freshly started server may print its URL before it answers HTTP.
+        // A freshly started server can take a while to answer HTTP, but it
+        // prints its URL only once listening: refusals mean it is gone.
         let deadline = Instant::now() + READY_TIMEOUT;
+        let mut refused = 0;
         while Instant::now() < deadline {
-            if transport::probe(port).await {
-                return Ok(Connection { port, token, tunnel });
+            match transport::probe_detailed(port).await {
+                transport::Probe::Healthy => return Ok(Connection { port, token, tunnel }),
+                transport::Probe::Refused => {
+                    refused += 1;
+                    if refused >= 8 {
+                        return Err("Kimi Code exited right after starting.".into());
+                    }
+                }
+                transport::Probe::Unhealthy => refused = 0,
             }
             tokio::time::sleep(Duration::from_millis(250)).await;
         }
@@ -434,8 +443,8 @@ fn backoff(attempt: u32) -> Duration {
     Duration::from_secs(STEPS[(attempt.saturating_sub(1) as usize).min(STEPS.len() - 1)])
 }
 
-pub fn kimi_url(port: u16, token: &str, integrated: bool) -> Url {
-    if !integrated {
+pub fn kimi_url(port: u16, token: &str, settings: &crate::config::Settings) -> Url {
+    if !settings.desktop_integration {
         return Url::parse(&format!("http://127.0.0.1:{port}/#token={token}")).expect("valid url");
     }
     // Kimi's web UI has an opt-in desktop presentation (traffic-light
@@ -447,10 +456,16 @@ pub fn kimi_url(port: u16, token: &str, integrated: bool) -> Url {
     } else {
         "linux"
     };
-    let native_titlebar = if cfg!(target_os = "macos") { "" } else { "&kimi_native_titlebar=1" };
-    Url::parse(&format!(
-        "http://127.0.0.1:{port}/?kimi_desktop=1&platform={platform}{native_titlebar}#token={token}"
-    ))
+    let mut flags = String::new();
+    if !cfg!(target_os = "macos") {
+        flags.push_str("&kimi_native_titlebar=1");
+    } else if settings.vibrancy {
+        flags.push_str("&kimi_vibrancy=1");
+    }
+    if settings.onboarded {
+        flags.push_str("&kimi_onboarded=1");
+    }
+    Url::parse(&format!("http://127.0.0.1:{port}/?kimi_desktop=1&platform={platform}{flags}#token={token}"))
     .expect("valid url")
 }
 

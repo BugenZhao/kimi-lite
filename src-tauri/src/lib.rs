@@ -54,10 +54,12 @@ fn open_host_window(app: &AppHandle, id: &str) -> Result<(), String> {
     let state = app.state::<AppState>();
     let host = state.store.lock().unwrap().get(id).cloned().ok_or("Unknown host.")?;
 
-    let integrated = state.store.lock().unwrap().settings.desktop_integration;
+    let settings = state.store.lock().unwrap().settings.clone();
+    let integrated = settings.desktop_integration;
     let seamless = integrated && cfg!(target_os = "macos");
     let bridge_config = serde_json::json!({
         "hooks": integrated,
+        "vibrancy": seamless && settings.vibrancy,
         "platform": std::env::consts::OS.replace("macos", "darwin").replace("windows", "win32"),
         // Height of the strip that drags the window (Kimi's header height).
         "dragStrip": if seamless { 48 } else { 0 },
@@ -100,10 +102,14 @@ fn open_host_window(app: &AppHandle, id: &str) -> Result<(), String> {
         });
     #[cfg(target_os = "macos")]
     let builder = if seamless {
+        // The material is always there; the page decides whether its
+        // sidebar lets it show through (so the setting applies live).
         builder
             .title_bar_style(tauri::TitleBarStyle::Overlay)
             .hidden_title(true)
             .traffic_light_position(tauri::LogicalPosition::new(16.0, 17.0))
+            .transparent(true)
+            .effects(sidebar_material())
     } else {
         builder
     }
@@ -154,7 +160,7 @@ pub fn show_hosts_window(app: &AppHandle, focus: Option<&str>) {
     };
     let builder = WebviewWindowBuilder::new(app, HOSTS_LABEL, WebviewUrl::App(url.into()))
         .title("Hosts")
-        .inner_size(820.0, 560.0)
+        .inner_size(860.0, 600.0)
         .min_inner_size(640.0, 420.0)
         .resizable(true)
         .on_navigation(|url| is_app_url(url));
@@ -164,12 +170,17 @@ pub fn show_hosts_window(app: &AppHandle, focus: Option<&str>) {
         .hidden_title(true)
         .traffic_light_position(tauri::LogicalPosition::new(18.0, 22.0))
         .transparent(true)
-        .effects(tauri::utils::config::WindowEffectsConfig {
-            effects: vec![tauri::window::Effect::Sidebar],
-            state: Some(tauri::window::EffectState::FollowsWindowActiveState),
-            ..Default::default()
-        });
+        .effects(sidebar_material());
     let _ = builder.build();
+}
+
+#[cfg(target_os = "macos")]
+fn sidebar_material() -> tauri::utils::config::WindowEffectsConfig {
+    tauri::utils::config::WindowEffectsConfig {
+        effects: vec![tauri::window::Effect::Sidebar],
+        state: Some(tauri::window::EffectState::FollowsWindowActiveState),
+        ..Default::default()
+    }
 }
 
 fn is_app_url(url: &Url) -> bool {
@@ -361,9 +372,16 @@ fn get_settings(state: tauri::State<AppState>) -> config::Settings {
 
 #[tauri::command]
 fn set_settings(app: AppHandle, state: tauri::State<AppState>, settings: config::Settings) {
+    let previous = state.store.lock().unwrap().settings.clone();
+    if settings.vibrancy != previous.vibrancy {
+        set_vibrancy(&app, &state, settings.vibrancy);
+    }
+    if settings.desktop_integration == previous.desktop_integration {
+        return;
+    }
     {
         let mut store = state.store.lock().unwrap();
-        store.settings = settings;
+        store.settings.desktop_integration = settings.desktop_integration;
         store.save();
     }
     // Window chrome is fixed at creation: reopen host windows to apply.
@@ -392,6 +410,33 @@ fn kd_set_theme(window: WebviewWindow, theme: String) {
         _ => None,
     };
     let _ = window.set_theme(theme);
+}
+
+#[tauri::command]
+fn kd_set_vibrancy(app: AppHandle, state: tauri::State<AppState>, enabled: bool) {
+    set_vibrancy(&app, &state, enabled);
+}
+
+#[tauri::command]
+fn kd_set_onboarded(state: tauri::State<AppState>) {
+    let mut store = state.store.lock().unwrap();
+    if !store.settings.onboarded {
+        store.settings.onboarded = true;
+        store.save();
+    }
+}
+
+fn set_vibrancy(app: &AppHandle, state: &AppState, enabled: bool) {
+    {
+        let mut store = state.store.lock().unwrap();
+        store.settings.vibrancy = enabled;
+        store.save();
+    }
+    for (label, window) in app.webview_windows() {
+        if host_id(&label).is_some() {
+            let _ = window.eval(format!("window.__kd && window.__kd.setVibrancy({enabled})"));
+        }
+    }
 }
 
 #[tauri::command]
@@ -469,6 +514,8 @@ pub fn run() {
             get_settings,
             set_settings,
             kd_set_theme,
+            kd_set_vibrancy,
+            kd_set_onboarded,
             kd_show_window,
             kd_notify,
             kd_retry,

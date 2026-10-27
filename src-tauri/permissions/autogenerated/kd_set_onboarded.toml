@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-kd-set-onboarded"
+description = "Enables the kd_set_onboarded command without any pre-configured scope."
+commands.allow = ["kd_set_onboarded"]
+
+[[permission]]
+identifier = "deny-kd-set-onboarded"
+description = "Denies the kd_set_onboarded command without any pre-configured scope."
+commands.deny = ["kd_set_onboarded"]

@@ -66,6 +66,13 @@ pub struct Settings {
     /// bar, should a Kimi update ever change those hooks.
     #[serde(default = "enabled")]
     pub desktop_integration: bool,
+    /// Native frosted-glass material behind Kimi's sidebar (macOS).
+    #[serde(default = "enabled")]
+    pub vibrancy: bool,
+    /// Kimi's first-run onboarding was completed once; every host (each
+    /// its own origin) is told so instead of asking again.
+    #[serde(default)]
+    pub onboarded: bool,
 }
 
 fn enabled() -> bool {
@@ -74,7 +81,7 @@ fn enabled() -> bool {
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { desktop_integration: true }
+        Self { desktop_integration: true, vibrancy: true, onboarded: false }
     }
 }
 

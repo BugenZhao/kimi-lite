@@ -13,6 +13,8 @@ fn main() {
             "get_settings",
             "set_settings",
             "kd_set_theme",
+            "kd_set_vibrancy",
+            "kd_set_onboarded",
             "kd_show_window",
             "kd_notify",
             "kd_retry",

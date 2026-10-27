@@ -1,42 +1,83 @@
+/* Design tokens mirror Kimi Code's web UI, so these pages read as part of it. */
+@font-face {
+  font-family: "Schibsted Grotesk Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 900;
+  src: url(fonts/SchibstedGrotesk.woff2) format("woff2-variations");
+}
+
 :root {
   color-scheme: light dark;
-  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --text: rgba(0, 0, 0, 0.86);
-  --muted: rgba(0, 0, 0, 0.5);
-  --faint: rgba(0, 0, 0, 0.28);
-  --line: rgba(0, 0, 0, 0.09);
-  --fill: rgba(0, 0, 0, 0.05);
-  --fill-strong: rgba(0, 0, 0, 0.09);
-  --pane: #ffffff;
-  --page: #ffffff;
-  --accent: #1d6ff2;
-  --on-accent: #fff;
-  --ok: #22c55e;
-  --warn: #f5a524;
-  --bad: #ef4444;
-  --select: rgba(0, 0, 0, 0.07);
+  --font-ui: "Schibsted Grotesk Variable", "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --color-text: rgba(0, 0, 0, 0.9);
+  --color-text-muted: rgba(0, 0, 0, 0.6);
+  --color-text-faint: rgba(0, 0, 0, 0.45);
+  --color-text-quaternary: rgba(0, 0, 0, 0.3);
+  --color-text-on-accent: #fff;
+  --color-line: rgba(0, 0, 0, 0.13);
+  --color-line-strong: rgba(0, 0, 0, 0.15);
+  --color-subtle: rgba(0, 0, 0, 0.05);
+  --color-selected: rgba(0, 0, 0, 0.05);
+  --color-hover: rgba(0, 0, 0, 0.03);
+  --color-surface-raised: #ffffff;
+  --color-surface-sunken: #f5f5f5;
+  --color-surface-overlay: #ffffff;
+  --bg: #ffffff;
+  --color-accent: #1783ff;
+  --color-accent-hover: #167ff7;
+  --color-accent-soft: #e8f3ff;
+  --color-danger: #c0392b;
+  --color-success: #0e7a38;
+  --color-warning: #a9610a;
+  --color-ok-dot: #22c55e;
+  --color-warn-dot: #f5a524;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 999px;
+  --hairline: 0.5px;
+  --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-md: 0 4px 12px rgba(16, 24, 40, 0.07), 0 2px 4px rgba(16, 24, 40, 0.05);
+  --focus-ring: 0 0 0 3px var(--color-accent-soft);
+  --duration: 0.16s;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --text: rgba(255, 255, 255, 0.88);
-    --muted: rgba(255, 255, 255, 0.52);
-    --faint: rgba(255, 255, 255, 0.28);
-    --line: rgba(255, 255, 255, 0.09);
-    --fill: rgba(255, 255, 255, 0.06);
-    --fill-strong: rgba(255, 255, 255, 0.11);
-    --pane: #1e1e1e;
-    --page: #121212;
-    --accent: #3b82f6;
-    --select: rgba(255, 255, 255, 0.08);
+    --color-text: rgba(255, 255, 255, 0.84);
+    --color-text-muted: rgba(255, 255, 255, 0.56);
+    --color-text-faint: rgba(255, 255, 255, 0.42);
+    --color-text-quaternary: rgba(255, 255, 255, 0.26);
+    --color-line: rgba(255, 255, 255, 0.12);
+    --color-line-strong: rgba(255, 255, 255, 0.14);
+    --color-subtle: rgba(255, 255, 255, 0.05);
+    --color-selected: rgba(255, 255, 255, 0.1);
+    --color-hover: rgba(255, 255, 255, 0.05);
+    --color-surface-raised: #292929;
+    --color-surface-sunken: #121212;
+    --color-surface-overlay: rgba(255, 255, 255, 0.06);
+    --bg: #121212;
+    --color-accent: #1a88ff;
+    --color-accent-hover: #258eff;
+    --color-accent-soft: rgba(26, 136, 255, 0.22);
+    --color-danger: #f85149;
+    --color-success: #3fb950;
+    --color-warning: #d29922;
   }
 }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
 body {
-  font: 13px/1.45 var(--font);
-  color: var(--text);
+  font: 400 var(--text-base)/1.5 var(--font-ui);
+  color: var(--color-text);
   -webkit-font-smoothing: antialiased;
   -webkit-user-select: none;
   user-select: none;
@@ -44,29 +85,64 @@ body {
 }
 input, textarea, .selectable { -webkit-user-select: text; user-select: text; }
 button { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
 
+/* Buttons (Kimi's ui-button sm). */
 .btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  height: 28px; padding: 0 12px; border-radius: 7px; border: 0;
-  background: var(--fill-strong); cursor: default; white-space: nowrap;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 30px; padding: 0 12px; border-radius: var(--radius-sm);
+  border: var(--hairline) solid var(--color-line-strong);
+  background: var(--color-surface-raised); color: var(--color-text);
+  box-shadow: var(--shadow-xs);
+  font-size: var(--text-sm); font-weight: 500; line-height: 1; white-space: nowrap; cursor: pointer;
+  transition: background var(--duration) var(--ease-out), border-color var(--duration) var(--ease-out);
 }
-.btn:hover { filter: brightness(0.97); }
-.btn:active { filter: brightness(0.92); }
-.btn.primary { background: var(--accent); color: var(--on-accent); font-weight: 500; }
-.btn.ghost { background: transparent; }
-.btn.ghost:hover { background: var(--fill); }
-.btn.danger { color: var(--bad); }
+.btn:hover { background: var(--color-surface-sunken); }
+.btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.btn.primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-text-on-accent); }
+.btn.primary:hover { background: var(--color-accent-hover); }
+.btn.ghost { background: transparent; border-color: transparent; box-shadow: none; color: var(--color-text-muted); }
+.btn.ghost:hover { background: var(--color-hover); color: var(--color-text); }
+.btn.danger { color: var(--color-danger); }
 .btn[disabled] { opacity: 0.45; pointer-events: none; }
 
-.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); flex: none; }
-.dot.ready { background: var(--ok); }
-.dot.connecting, .dot.reconnecting { background: var(--warn); animation: pulse 1.2s ease-in-out infinite; }
-.dot.failed { background: var(--bad); }
+/* Inputs (Kimi's ui-input). */
+.input {
+  width: 100%; height: 32px; padding: 0 12px;
+  border: var(--hairline) solid var(--color-line-strong); border-radius: var(--radius-md);
+  background: var(--color-surface-overlay); color: var(--color-text); box-shadow: var(--shadow-xs);
+  font: inherit; font-size: var(--text-sm); outline: none;
+  transition: border-color var(--duration) var(--ease-out), box-shadow var(--duration) var(--ease-out);
+}
+.input::placeholder { color: var(--color-text-quaternary); }
+.input:focus { border-color: var(--color-accent); box-shadow: var(--focus-ring); }
+
+/* Switch (Kimi's ui-switch). */
+.switch {
+  position: relative; width: 36px; height: 20px; flex: none; padding: 0; appearance: none; margin: 0;
+  border: var(--hairline) solid var(--color-line-strong); border-radius: var(--radius-full);
+  background: var(--color-line-strong); cursor: pointer; transition: background 0.24s ease-in-out;
+}
+.switch::after {
+  content: ""; position: absolute; top: 50%; left: 1.5px; width: 16px; height: 16px;
+  border-radius: var(--radius-full); background: #fff; box-shadow: var(--shadow-xs);
+  transform: translateY(-50%); transition: left 0.24s ease-in-out;
+}
+.switch:checked { background: var(--color-accent); border-color: var(--color-accent); }
+.switch:checked::after { left: calc(100% - 16px - 1.5px); }
+.switch:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+/* Status dots. */
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-text-quaternary); flex: none; }
+.dot.ready { background: var(--color-ok-dot); }
+.dot.connecting, .dot.reconnecting { background: var(--color-warn-dot); animation: pulse 1.2s ease-in-out infinite; }
+.dot.failed { background: var(--color-danger); }
 @keyframes pulse { 50% { opacity: 0.35; } }
 
 .log {
-  font: 11.5px/1.55 var(--mono); color: var(--muted);
-  background: var(--fill); border-radius: 8px; padding: 10px 12px;
+  font: 12px/1.6 var(--font-mono); color: var(--color-text-muted);
+  background: var(--color-surface-sunken); border: var(--hairline) solid var(--color-line);
+  border-radius: var(--radius-md); padding: 10px 12px;
   white-space: pre-wrap; word-break: break-word; overflow: auto;
   -webkit-user-select: text; user-select: text;
 }

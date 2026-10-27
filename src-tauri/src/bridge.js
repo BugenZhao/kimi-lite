@@ -45,6 +45,44 @@
   }
   Object.defineProperty(window, 'Notification', { value: KdNotification, configurable: true, writable: true });
 
+  // ---- Frosted sidebar ------------------------------------------------------
+  // The window carries the native sidebar material. Kimi's own desktop UI
+  // opts in with `?kimi_vibrancy=1` (html.vibrancy); for builds that do not
+  // know it yet, this shim mirrors its rules: the page background goes
+  // transparent and the sidebar drops its fill, while the main pane keeps
+  // its own opaque background. Unknown markup simply stays opaque.
+  let vibrancy = !!config.vibrancy;
+  const VIBRANCY_CSS = `
+    html.kl-vibrancy, html.kl-vibrancy body, html.kl-vibrancy #app, html.kl-vibrancy .app {
+      background: transparent !important;
+    }
+    html.kl-vibrancy { --color-sidebar-bg: transparent; }`;
+  // Only once Kimi's layout is on the page: until then the transparent page
+  // would show nothing but glass.
+  const layoutReady = () => !!document.querySelector('#app .app');
+  let waiting = null;
+  const applyVibrancy = () => {
+    const root = document.documentElement;
+    if (!root) return;
+    if (vibrancy && !layoutReady()) {
+      if (!waiting) {
+        waiting = new MutationObserver(() => layoutReady() && applyVibrancy());
+        waiting.observe(root, { childList: true, subtree: true });
+      }
+      return;
+    }
+    waiting?.disconnect();
+    waiting = null;
+    if (!document.getElementById('kl-vibrancy-style')) {
+      const style = document.createElement('style');
+      style.id = 'kl-vibrancy-style';
+      style.textContent = VIBRANCY_CSS;
+      (document.head || root).appendChild(style);
+    }
+    root.classList.toggle('kl-vibrancy', vibrancy);
+  };
+  if (config.platform === 'darwin') applyVibrancy();
+
   // ---- Optional Kimi desktop hooks ----------------------------------------
   const menuListeners = new Set();
   if (config.hooks) {
@@ -58,8 +96,19 @@
       showWindow() {
         invoke('kd_show_window').catch(noop);
       },
-      // The window follows the system appearance; the page themes itself.
-      setTheme: noop,
+      // 'light' | 'dark' pin the window appearance (title bar, glass);
+      // 'system' follows macOS again.
+      setTheme(theme) {
+        invoke('kd_set_theme', { theme: String(theme) }).catch(noop);
+      },
+      getVibrancy: () => Promise.resolve(vibrancy),
+      setVibrancy(enabled) {
+        invoke('kd_set_vibrancy', { enabled: !!enabled }).catch(noop);
+      },
+      // Remembered app-wide, so other hosts skip the first-run screens.
+      setOnboarded() {
+        invoke('kd_set_onboarded').catch(noop);
+      },
       // Updates come from Kimi Code itself, not from this shell.
       onUpdateStatus: () => noop,
       getUpdateStatus: () => Promise.resolve({ state: 'idle' }),
@@ -108,35 +157,33 @@
         :host { all: initial; }
         /* Below the 48px header strip, so the page title stays readable. */
         .wrap { display:flex; justify-content:center; padding-top:58px; }
+        /* Kimi's own tokens when the page defines them, matching fallbacks otherwise. */
         .pill {
           pointer-events:auto; display:flex; align-items:center; gap:8px;
-          font: 500 12px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-          color: rgba(0,0,0,.82); background: rgba(250,250,250,.86);
-          border: .5px solid rgba(0,0,0,.12); border-radius: 999px;
-          padding: 6px 6px 6px 10px; box-shadow: 0 4px 16px rgba(0,0,0,.12);
-          backdrop-filter: blur(20px) saturate(1.6); -webkit-backdrop-filter: blur(20px) saturate(1.6);
-          transform: translateY(-8px); opacity: 0;
-          transition: opacity .18s ease, transform .18s ease;
+          font: 500 13px/1 var(--font-ui, "Schibsted Grotesk Variable", -apple-system, system-ui, sans-serif);
+          color: var(--color-text, rgba(0,0,0,.9));
+          background: var(--color-surface-raised, #fff);
+          border: .5px solid var(--color-line, rgba(0,0,0,.13)); border-radius: 999px;
+          padding: 5px 5px 5px 12px;
+          box-shadow: 0 4px 12px rgba(16,24,40,.07), 0 2px 4px rgba(16,24,40,.05);
+          transform: translateY(-6px); opacity: 0;
+          transition: opacity .16s cubic-bezier(.16,1,.3,1), transform .16s cubic-bezier(.16,1,.3,1);
         }
         .pill.show { opacity:1; transform:none; }
-        .pill.ok { padding-right: 10px; }
-        .dot { width:8px; height:8px; border-radius:50%; background:#f5a524; flex:none; }
+        .pill.ok, .pill.idle { padding-right: 12px; }
+        .dot { width:7px; height:7px; border-radius:50%; background:#f5a524; flex:none; }
         .ok .dot { background:#22c55e; }
         .spin { animation: pulse 1.2s ease-in-out infinite; }
         @keyframes pulse { 50% { opacity:.35; } }
         .msg { white-space:nowrap; max-width:60vw; overflow:hidden; text-overflow:ellipsis; }
-        .muted { opacity:.55; font-variant-numeric: tabular-nums; }
+        .muted { color: var(--color-text-faint, rgba(0,0,0,.45)); font-variant-numeric: tabular-nums; }
         button {
-          font: inherit; color: inherit; cursor: pointer;
-          background: rgba(0,0,0,.06); border: 0; border-radius: 999px; padding: 4px 10px;
+          font: inherit; color: inherit; cursor: pointer; height: 24px;
+          background: var(--color-surface-sunken, #f5f5f5); border: .5px solid var(--color-line-strong, rgba(0,0,0,.15));
+          border-radius: 999px; padding: 0 10px;
         }
-        button:hover { background: rgba(0,0,0,.1); }
+        button:hover { background: var(--color-selected, rgba(0,0,0,.05)); }
         .ok button, .ok .muted, .idle button { display:none; }
-        @media (prefers-color-scheme: dark) {
-          .pill { color: rgba(255,255,255,.88); background: rgba(40,40,40,.82); border-color: rgba(255,255,255,.12); box-shadow: 0 4px 16px rgba(0,0,0,.4); }
-          button { background: rgba(255,255,255,.1); }
-          button:hover { background: rgba(255,255,255,.16); }
-        }
       </style>
       <div class="wrap"><div class="pill" role="status" aria-live="polite">
         <span class="dot"></span><span class="msg"></span><span class="muted"></span>
@@ -191,6 +238,10 @@
       // Standard signal: lets the app re-open its socket right away instead
       // of waiting out its own backoff.
       window.dispatchEvent(new Event('online'));
+    },
+    setVibrancy(enabled) {
+      vibrancy = !!enabled;
+      applyVibrancy();
     },
     menu(action) {
       for (const listener of menuListeners) {

@@ -6,23 +6,23 @@
     <title>Connecting</title>
     <link rel="stylesheet" href="style.css" />
     <style>
-      body { background: var(--page); display: grid; place-items: center; }
+      body { background: var(--bg); display: grid; place-items: center; }
       .drag { position: fixed; inset: 0 0 auto 0; height: 48px; }
       main { width: min(520px, calc(100vw - 48px)); display: flex; flex-direction: column; align-items: center; text-align: center; }
       .mark { width: 88px; height: 88px; margin: -12px 0 6px; }
-      h1 { font-size: 17px; font-weight: 600; margin: 0 0 6px; letter-spacing: -0.01em; }
-      .status { display: flex; align-items: center; gap: 8px; color: var(--muted); min-height: 20px; }
+      h1 { font-size: 18px; font-weight: 600; margin: 0 0 6px; letter-spacing: -0.01em; }
+      .status { display: flex; align-items: center; gap: 8px; color: var(--color-text-muted); font-size: var(--text-sm); min-height: 20px; }
       .status span:last-child { white-space: pre-wrap; text-align: left; }
-      .bar { width: 160px; height: 3px; border-radius: 3px; background: var(--fill-strong); overflow: hidden; margin: 22px 0 0; }
-      .bar::after { content: ""; display: block; width: 40%; height: 100%; border-radius: 3px; background: var(--accent); animation: slide 1.1s ease-in-out infinite; }
+      .bar { width: 160px; height: 3px; border-radius: 3px; background: var(--color-subtle); overflow: hidden; margin: 22px 0 0; }
+      .bar::after { content: ""; display: block; width: 40%; height: 100%; border-radius: 3px; background: var(--color-accent); animation: slide 1.1s ease-in-out infinite; }
       @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
       .actions { display: none; gap: 8px; margin-top: 22px; }
       .failed .bar, .stopped .bar { display: none; }
       .failed .actions, .stopped .actions { display: flex; }
       details { width: 100%; margin-top: 28px; text-align: left; }
-      summary { color: var(--faint); font-size: 12px; cursor: default; list-style: none; text-align: center; }
+      summary { color: var(--color-text-faint); font-size: var(--text-xs); cursor: pointer; list-style: none; text-align: center; }
       summary::-webkit-details-marker { display: none; }
-      summary:hover { color: var(--muted); }
+      summary:hover { color: var(--color-text-muted); }
       .log { margin-top: 10px; max-height: 220px; }
     </style>
   </head>
