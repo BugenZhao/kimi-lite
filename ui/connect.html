@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Connecting</title>
+    <link rel="stylesheet" href="style.css" />
+    <style>
+      body { background: var(--page); display: grid; place-items: center; }
+      .drag { position: fixed; inset: 0 0 auto 0; height: 48px; }
+      main { width: min(520px, calc(100vw - 48px)); display: flex; flex-direction: column; align-items: center; text-align: center; }
+      .mark { width: 56px; height: 56px; border-radius: 14px; margin-bottom: 18px; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+      h1 { font-size: 17px; font-weight: 600; margin: 0 0 6px; letter-spacing: -0.01em; }
+      .status { display: flex; align-items: center; gap: 8px; color: var(--muted); min-height: 20px; }
+      .status span:last-child { white-space: pre-wrap; text-align: left; }
+      .bar { width: 160px; height: 3px; border-radius: 3px; background: var(--fill-strong); overflow: hidden; margin: 22px 0 0; }
+      .bar::after { content: ""; display: block; width: 40%; height: 100%; border-radius: 3px; background: var(--accent); animation: slide 1.1s ease-in-out infinite; }
+      @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+      .actions { display: none; gap: 8px; margin-top: 22px; }
+      .failed .bar, .stopped .bar { display: none; }
+      .failed .actions, .stopped .actions { display: flex; }
+      details { width: 100%; margin-top: 28px; text-align: left; }
+      summary { color: var(--faint); font-size: 12px; cursor: default; list-style: none; text-align: center; }
+      summary::-webkit-details-marker { display: none; }
+      summary:hover { color: var(--muted); }
+      .log { margin-top: 10px; max-height: 220px; }
+    </style>
+  </head>
+  <body>
+    <div class="drag" data-tauri-drag-region></div>
+    <main id="main">
+      <img class="mark" src="icon.png" alt="" />
+      <h1 id="name">Kimi Code</h1>
+      <div class="status"><span class="dot connecting" id="dot"></span><span id="message">Starting…</span></div>
+      <div class="bar"></div>
+      <div class="actions">
+        <button class="btn primary" id="retry">Try Again</button>
+        <button class="btn" id="edit">Edit Host…</button>
+      </div>
+      <details id="details">
+        <summary>Show details</summary>
+        <div class="log" id="log"></div>
+      </details>
+    </main>
+    <script>
+      const { invoke } = window.__TAURI__.core;
+      const { listen } = window.__TAURI__.event;
+      const id = new URLSearchParams(location.search).get('host');
+      const $ = (sel) => document.getElementById(sel);
+
+      function render(status) {
+        if (!status || status.id !== id) return;
+        $('name').textContent = status.name;
+        document.title = status.name;
+        $('dot').className = `dot ${status.phase}`;
+        let message = status.message;
+        if (status.retryIn) message += ` Retrying in ${status.retryIn}s…`;
+        $('message').textContent = message;
+        $('main').className = status.phase;
+        $('retry').textContent = status.phase === 'stopped' ? 'Start Kimi Code' : 'Try Again';
+        const log = $('log');
+        log.textContent = status.log.join('\n');
+        log.scrollTop = log.scrollHeight;
+        if (status.phase === 'failed') $('details').open = true;
+      }
+
+      $('retry').onclick = () => invoke('host_action', { id, action: 'retry' });
+      $('edit').onclick = () => invoke('show_hosts', { focus: id });
+      listen('host-status', (event) => render(event.payload));
+      invoke('host_status', { id }).then(render);
+    </script>
+  </body>
+</html>

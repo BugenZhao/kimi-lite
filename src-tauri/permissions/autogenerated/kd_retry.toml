@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-kd-retry"
+description = "Enables the kd_retry command without any pre-configured scope."
+commands.allow = ["kd_retry"]
+
+[[permission]]
+identifier = "deny-kd-retry"
+description = "Denies the kd_retry command without any pre-configured scope."
+commands.deny = ["kd_retry"]

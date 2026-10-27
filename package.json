@@ -1,0 +1,14 @@
+{
+  "name": "kimi-desktop-next",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  },
+  "packageManager": "pnpm@10.33.0"
+}

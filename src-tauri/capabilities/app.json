@@ -1,0 +1,22 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "app",
+  "description": "The app's own pages (host list, connection screen).",
+  "windows": ["hosts", "host-*"],
+  "permissions": [
+    "core:event:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-internal-toggle-maximize",
+    "allow-list-hosts",
+    "allow-save-host",
+    "allow-delete-host",
+    "allow-reorder-hosts",
+    "allow-open-host",
+    "allow-show-hosts",
+    "allow-ssh-config-hosts",
+    "allow-host-status",
+    "allow-host-action",
+    "allow-get-settings",
+    "allow-set-settings"
+  ]
+}

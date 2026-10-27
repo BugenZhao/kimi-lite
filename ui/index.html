@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hosts</title>
+    <link rel="stylesheet" href="style.css" />
+    <style>
+      body { display: flex; background: transparent; overflow: hidden; }
+
+      /* Sidebar sits on the window's vibrancy. */
+      aside { width: 240px; flex: none; display: flex; flex-direction: column; padding: 52px 10px 10px; }
+      .section { font-size: 11px; font-weight: 600; color: var(--faint); padding: 0 8px 6px; }
+      ul { list-style: none; margin: 0; padding: 0; flex: 1; overflow: auto; }
+      li {
+        display: flex; align-items: center; gap: 9px; height: 40px; padding: 0 8px; border-radius: 7px;
+        margin-bottom: 1px;
+      }
+      li.selected { background: var(--select); }
+      li.dragging { opacity: 0.4; }
+      li.drop-before { box-shadow: inset 0 2px 0 var(--accent); }
+      li .glyph { width: 18px; height: 18px; color: var(--muted); flex: none; }
+      li .text { flex: 1; min-width: 0; line-height: 1.25; }
+      li .title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      li .sub { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .footer { display: flex; gap: 2px; padding-top: 8px; }
+      .icon-btn { width: 28px; height: 28px; border-radius: 6px; border: 0; background: transparent; display: grid; place-items: center; color: var(--muted); }
+      .icon-btn:hover { background: var(--fill); color: var(--text); }
+      .icon-btn svg { width: 16px; height: 16px; }
+      .footer .spacer { flex: 1; }
+
+      /* Detail pane is opaque, like a native split view. */
+      section.detail {
+        flex: 1; min-width: 0; background: var(--pane); border-left: 0.5px solid var(--line);
+        overflow: auto; padding: 44px 36px 32px;
+      }
+      .head { display: flex; align-items: center; gap: 14px; margin-bottom: 4px; }
+      .head .glyph { width: 40px; height: 40px; padding: 8px; border-radius: 10px; background: var(--fill); color: var(--muted); flex: none; }
+      .head h1 { font-size: 20px; font-weight: 600; margin: 0; letter-spacing: -0.01em; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .state { display: flex; align-items: center; gap: 7px; color: var(--muted); margin: 10px 0 18px; min-height: 19px; }
+      .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 28px; }
+
+      form { display: grid; grid-template-columns: 140px 1fr; gap: 12px 14px; align-items: center; max-width: 560px; }
+      label.field { text-align: right; color: var(--muted); }
+      input[type="text"] {
+        height: 28px; border-radius: 6px; border: 0.5px solid var(--line); background: var(--page);
+        padding: 0 9px; font: inherit; color: inherit; outline: none; width: 100%;
+        box-shadow: 0 0.5px 1px rgba(0,0,0,.05);
+      }
+      input[type="text"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+      .hint { grid-column: 2; color: var(--faint); font-size: 11.5px; margin-top: -6px; }
+      .check { display: flex; align-items: center; gap: 8px; }
+      .form-actions { grid-column: 2; display: flex; gap: 8px; margin-top: 6px; }
+      .error { grid-column: 2; color: var(--bad); font-size: 12px; }
+      .error:empty { display: none; }
+      .divider { height: 0.5px; background: var(--line); margin: 28px 0 22px; max-width: 560px; }
+      .muted { color: var(--muted); }
+      .prose { color: var(--muted); max-width: 520px; margin: 0 0 18px; }
+      [hidden] { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <aside data-tauri-drag-region>
+      <div class="section" data-tauri-drag-region>Hosts</div>
+      <ul id="list"></ul>
+      <div class="footer">
+        <button class="icon-btn" id="add" title="Add SSH Host">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>
+        </button>
+        <span class="spacer"></span>
+        <button class="icon-btn" id="settings" title="Settings">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.8v1.7M8 12.5v1.7M14.2 8h-1.7M3.5 8H1.8M12.4 3.6l-1.2 1.2M4.8 11.2l-1.2 1.2M12.4 12.4l-1.2-1.2M4.8 4.8L3.6 3.6"/></svg>
+        </button>
+      </div>
+    </aside>
+
+    <section class="detail" id="detail">
+      <div id="host-view" hidden>
+        <div class="head">
+          <span class="glyph" id="head-glyph"></span>
+          <h1 id="head-name"></h1>
+        </div>
+        <div class="state"><span class="dot" id="state-dot"></span><span id="state-text"></span></div>
+        <div class="actions" id="actions">
+          <button class="btn primary" id="open">Open</button>
+          <button class="btn" id="reconnect" hidden>Reconnect</button>
+          <button class="btn" id="restart" hidden>Restart Kimi Code</button>
+          <button class="btn ghost danger" id="stop" hidden>Stop Kimi Code</button>
+        </div>
+        <form id="form" autocomplete="off" spellcheck="false">
+          <label class="field" for="f-name">Name</label>
+          <input type="text" id="f-name" required />
+          <label class="field" for="f-ssh" id="l-ssh">SSH host</label>
+          <input type="text" id="f-ssh" list="ssh-hosts" placeholder="alias from ~/.ssh/config or user@host" />
+          <div class="hint" id="h-ssh">Uses your own OpenSSH, so ProxyJump, keys and agents just work.</div>
+          <label class="field" for="f-command">Kimi command</label>
+          <input type="text" id="f-command" placeholder="kimi" />
+          <label class="field">GPUs</label>
+          <label class="check"><input type="checkbox" id="f-gpus" /> Hide GPUs from the agent</label>
+          <div class="hint">Agents must request GPUs through Slurm (srun / sbatch --gres=gpu:N).</div>
+          <div class="error" id="error"></div>
+          <div class="form-actions">
+            <button class="btn primary" type="submit" id="save">Save</button>
+            <button class="btn ghost danger" type="button" id="delete">Remove Host</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="settings-view" hidden>
+        <div class="head"><h1>Settings</h1></div>
+        <div class="divider" style="margin-top: 18px"></div>
+        <form id="settings-form">
+          <label class="field">Appearance</label>
+          <label class="check"><input type="checkbox" id="s-integration" /> Seamless desktop integration</label>
+          <div class="hint">
+            Uses Kimi Code's built-in desktop presentation and blends its header into the window title bar.
+            Turn this off to show the plain web UI under a standard title bar, for example if a Kimi Code update changes how it looks.
+          </div>
+        </form>
+        <div class="divider"></div>
+        <p class="prose">
+          Kimi Code keeps running on each host after its window closes or the connection drops, so agents keep working.
+          Use <b>Stop Kimi Code</b> on a host to shut it down.
+        </p>
+      </div>
+    </section>
+
+    <datalist id="ssh-hosts"></datalist>
+
+    <script>
+      const { invoke } = window.__TAURI__.core;
+      const { listen } = window.__TAURI__.event;
+      const $ = (id) => document.getElementById(id);
+
+      const ICONS = {
+        local: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/></svg>',
+        ssh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="4" y="4" width="16" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="16" height="6.5" rx="1.5"/><path d="M7.5 7.25h.01M7.5 16.75h.01" stroke-width="2.2" stroke-linecap="round"/></svg>',
+      };
+      const PHASE_TEXT = {
+        ready: 'Connected',
+        connecting: 'Connecting…',
+        reconnecting: 'Reconnecting…',
+        failed: 'Not connected',
+        stopped: 'Stopped',
+      };
+
+      let hosts = [];
+      let selected = null; // host id, 'new' or 'settings'
+
+      async function refresh() {
+        hosts = await invoke('list_hosts');
+        if (selected && selected !== 'new' && selected !== 'settings' && !hosts.some((h) => h.id === selected)) selected = null;
+        if (!selected) selected = hosts[0]?.id ?? 'new';
+        renderList();
+        renderDetail(false);
+      }
+
+      function subtitle(host) {
+        if (host.status) {
+          const phase = PHASE_TEXT[host.status.phase];
+          return host.sshHost ? `${host.sshHost} · ${phase}` : phase;
+        }
+        return host.sshHost ?? 'This computer';
+      }
+
+      function renderList() {
+        const list = $('list');
+        list.textContent = '';
+        for (const host of hosts) {
+          const li = document.createElement('li');
+          li.className = host.id === selected ? 'selected' : '';
+          li.draggable = host.id !== 'local';
+          li.dataset.id = host.id;
+          li.innerHTML = `<span class="glyph">${host.sshHost ? ICONS.ssh : ICONS.local}</span>
+            <span class="text"><div class="title"></div><div class="sub"></div></span>
+            <span class="dot ${host.status?.phase ?? ''}"></span>`;
+          li.querySelector('.title').textContent = host.name;
+          li.querySelector('.sub').textContent = subtitle(host);
+          li.onclick = () => select(host.id);
+          li.ondblclick = () => invoke('open_host', { id: host.id });
+          wireDrag(li);
+          list.appendChild(li);
+        }
+        if (selected === 'new') {
+          const li = document.createElement('li');
+          li.className = 'selected';
+          li.innerHTML = `<span class="glyph">${ICONS.ssh}</span><span class="text"><div class="title">New Host</div></span>`;
+          list.appendChild(li);
+        }
+      }
+
+      function select(id) {
+        selected = id;
+        renderList();
+        renderDetail(true);
+      }
+
+      function current() {
+        return hosts.find((h) => h.id === selected);
+      }
+
+      function renderDetail(resetForm) {
+        $('settings-view').hidden = selected !== 'settings';
+        $('host-view').hidden = selected === 'settings';
+        if (selected === 'settings') return;
+
+        const host = current() ?? { id: '', name: '', sshHost: '', command: 'kimi', hideGpus: false };
+        const isNew = selected === 'new';
+        const isLocal = host.id === 'local';
+        $('head-glyph').innerHTML = isLocal ? ICONS.local : ICONS.ssh;
+        $('head-name').textContent = isNew ? 'New SSH Host' : host.name;
+
+        const phase = host.status?.phase;
+        $('state-dot').className = `dot ${phase ?? ''}`;
+        $('state-dot').hidden = isNew;
+        $('state-text').textContent = isNew
+          ? 'Kimi Code is started on the host over SSH and shown here through a private tunnel.'
+          : phase ? `${PHASE_TEXT[phase]}${host.status.message && phase !== 'ready' ? ` — ${host.status.message}` : ''}` : 'Not open';
+        $('actions').hidden = isNew;
+        $('open').textContent = phase ? 'Show Window' : 'Open';
+        const live = phase && phase !== 'stopped';
+        $('reconnect').hidden = !live;
+        $('restart').hidden = !live;
+        $('stop').hidden = !live;
+
+        $('l-ssh').hidden = $('f-ssh').hidden = $('h-ssh').hidden = isLocal;
+        $('delete').hidden = isNew || isLocal;
+        $('save').textContent = isNew ? 'Add Host' : 'Save';
+        if (resetForm) {
+          $('f-name').value = host.name;
+          $('f-ssh').value = host.sshHost ?? '';
+          $('f-command').value = host.command;
+          $('f-gpus').checked = host.hideGpus;
+          $('error').textContent = '';
+          if (isNew) $('f-ssh').focus();
+        }
+      }
+
+      $('f-ssh').addEventListener('input', () => {
+        // Name follows the SSH host until edited by hand.
+        const name = $('f-name');
+        if (!name.dataset.touched) name.value = $('f-ssh').value;
+      });
+      $('f-name').addEventListener('input', () => ($('f-name').dataset.touched = '1'));
+
+      $('form').onsubmit = async (event) => {
+        event.preventDefault();
+        const host = current();
+        const isNew = selected === 'new';
+        try {
+          const saved = await invoke('save_host', {
+            host: {
+              id: isNew ? '' : host.id,
+              name: $('f-name').value || $('f-ssh').value,
+              sshHost: host?.id === 'local' ? null : $('f-ssh').value,
+              command: $('f-command').value || 'kimi',
+              hideGpus: $('f-gpus').checked,
+            },
+          });
+          delete $('f-name').dataset.touched;
+          selected = saved.id;
+          await refresh();
+          renderDetail(true);
+          if (isNew) invoke('open_host', { id: saved.id });
+        } catch (error) {
+          $('error').textContent = String(error);
+        }
+      };
+
+      $('delete').onclick = async () => {
+        await invoke('delete_host', { id: selected });
+        selected = null;
+        await refresh();
+        renderDetail(true);
+      };
+      $('open').onclick = () => invoke('open_host', { id: selected });
+      $('reconnect').onclick = () => invoke('host_action', { id: selected, action: 'retry' });
+      $('restart').onclick = () => invoke('host_action', { id: selected, action: 'restart' });
+      $('stop').onclick = () => invoke('host_action', { id: selected, action: 'stop' });
+      $('add').onclick = () => {
+        delete $('f-name').dataset.touched;
+        select('new');
+      };
+      $('settings').onclick = () => select('settings');
+
+      $('s-integration').onchange = (event) =>
+        invoke('set_settings', { settings: { desktopIntegration: event.target.checked } });
+
+      // Drag to reorder (the local host stays first).
+      let dragged = null;
+      function wireDrag(li) {
+        li.addEventListener('dragstart', (e) => {
+          dragged = li.dataset.id;
+          li.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+        });
+        li.addEventListener('dragend', () => {
+          dragged = null;
+          renderList();
+        });
+        li.addEventListener('dragover', (e) => {
+          if (!dragged || li.dataset.id === 'local') return;
+          e.preventDefault();
+          document.querySelectorAll('.drop-before').forEach((n) => n.classList.remove('drop-before'));
+          li.classList.add('drop-before');
+        });
+        li.addEventListener('drop', async (e) => {
+          e.preventDefault();
+          const ids = hosts.map((h) => h.id).filter((id) => id !== dragged);
+          ids.splice(ids.indexOf(li.dataset.id), 0, dragged);
+          await invoke('reorder_hosts', { ids });
+          await refresh();
+        });
+      }
+
+      window.editHost = (id) => select(id);
+
+      listen('host-status', (event) => {
+        const host = hosts.find((h) => h.id === event.payload.id);
+        if (!host) return;
+        host.status = event.payload;
+        renderList();
+        renderDetail(false);
+      });
+      window.addEventListener('focus', refresh);
+
+      (async () => {
+        const params = new URLSearchParams(location.search);
+        selected = params.get('edit');
+        const [settings, sshHosts] = await Promise.all([invoke('get_settings'), invoke('ssh_config_hosts')]);
+        $('s-integration').checked = settings.desktopIntegration;
+        $('ssh-hosts').innerHTML = sshHosts.map((h) => `<option value="${h.replace(/"/g, '&quot;')}">`).join('');
+        await refresh();
+        renderDetail(true);
+      })();
+    </script>
+  </body>
+</html>

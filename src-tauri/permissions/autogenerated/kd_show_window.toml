@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-kd-show-window"
+description = "Enables the kd_show_window command without any pre-configured scope."
+commands.allow = ["kd_show_window"]
+
+[[permission]]
+identifier = "deny-kd-show-window"
+description = "Denies the kd_show_window command without any pre-configured scope."
+commands.deny = ["kd_show_window"]

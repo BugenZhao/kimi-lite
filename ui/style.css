@@ -1,0 +1,72 @@
+:root {
+  color-scheme: light dark;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --text: rgba(0, 0, 0, 0.86);
+  --muted: rgba(0, 0, 0, 0.5);
+  --faint: rgba(0, 0, 0, 0.28);
+  --line: rgba(0, 0, 0, 0.09);
+  --fill: rgba(0, 0, 0, 0.05);
+  --fill-strong: rgba(0, 0, 0, 0.09);
+  --pane: #ffffff;
+  --page: #ffffff;
+  --accent: #1d6ff2;
+  --on-accent: #fff;
+  --ok: #22c55e;
+  --warn: #f5a524;
+  --bad: #ef4444;
+  --select: rgba(0, 0, 0, 0.07);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text: rgba(255, 255, 255, 0.88);
+    --muted: rgba(255, 255, 255, 0.52);
+    --faint: rgba(255, 255, 255, 0.28);
+    --line: rgba(255, 255, 255, 0.09);
+    --fill: rgba(255, 255, 255, 0.06);
+    --fill-strong: rgba(255, 255, 255, 0.11);
+    --pane: #1e1e1e;
+    --page: #121212;
+    --accent: #3b82f6;
+    --select: rgba(255, 255, 255, 0.08);
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font: 13px/1.45 var(--font);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+}
+input, textarea, .selectable { -webkit-user-select: text; user-select: text; }
+button { font: inherit; color: inherit; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 28px; padding: 0 12px; border-radius: 7px; border: 0;
+  background: var(--fill-strong); cursor: default; white-space: nowrap;
+}
+.btn:hover { filter: brightness(0.97); }
+.btn:active { filter: brightness(0.92); }
+.btn.primary { background: var(--accent); color: var(--on-accent); font-weight: 500; }
+.btn.ghost { background: transparent; }
+.btn.ghost:hover { background: var(--fill); }
+.btn.danger { color: var(--bad); }
+.btn[disabled] { opacity: 0.45; pointer-events: none; }
+
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); flex: none; }
+.dot.ready { background: var(--ok); }
+.dot.connecting, .dot.reconnecting { background: var(--warn); animation: pulse 1.2s ease-in-out infinite; }
+.dot.failed { background: var(--bad); }
+@keyframes pulse { 50% { opacity: 0.35; } }
+
+.log {
+  font: 11.5px/1.55 var(--mono); color: var(--muted);
+  background: var(--fill); border-radius: 8px; padding: 10px 12px;
+  white-space: pre-wrap; word-break: break-word; overflow: auto;
+  -webkit-user-select: text; user-select: text;
+}
