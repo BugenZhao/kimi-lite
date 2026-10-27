@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Kimi Desktop",
+  "productName": "Kimi Lite",
   "version": "0.1.0",
-  "identifier": "com.bugenzhao.kimidesktop",
+  "identifier": "com.bugenzhao.kimilite",
   "build": {
     "frontendDist": "../ui"
   },

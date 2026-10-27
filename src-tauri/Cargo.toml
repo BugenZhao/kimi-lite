@@ -1,10 +1,10 @@
 [package]
-name = "kimi-desktop"
+name = "kimi-lite"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "kimi_desktop_lib"
+name = "kimi_lite_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

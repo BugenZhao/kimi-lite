@@ -1,4 +1,4 @@
-# Kimi Desktop (next)
+# Kimi Lite
 
 A lightweight native shell for [Kimi Code](https://github.com/MoonshotAI/kimi-code)'s web UI, on this computer or on any SSH host. It's the successor to `kimi-desktop`, rebuilt on Tauri (system WebView, no Electron).
 
@@ -22,7 +22,7 @@ Kimi Code moves fast, so the app relies on as little of it as possible.
 | `new Notification(...)`, the `online` event | Web standards |
 | `?kimi_desktop=1&platform=…`, optional `window.kimiDesktop` hooks (`onMenuAction`, `showWindow`) | Opt-in, degrades to plain web mode |
 
-The app does **not** read `~/.kimi-code` internals (server registry, tokens), call private API routes, or reach into the page's framework state. Servers are tracked with a pidfile and log the app owns, under `${XDG_STATE_HOME:-~/.local/state}/kimi-desktop/` on each host.
+The app does **not** read `~/.kimi-code` internals (server registry, tokens), call private API routes, or reach into the page's framework state. Servers are tracked with a pidfile and log the app owns, under `${XDG_STATE_HOME:-~/.local/state}/kimi-lite/` on each host.
 
 If a Kimi update ever breaks the desktop presentation, turn off **Settings → Seamless desktop integration**. The app then shows the plain web UI under a standard title bar.
 
@@ -75,4 +75,4 @@ ui/              Hosts window and connection screen (plain HTML)
 
 ## License and branding
 
-MIT. “Kimi” and related marks belong to their respective owners. The icon reuses the favicon from the MIT-licensed Kimi Code repository.
+MIT. “Kimi” and related marks belong to their respective owners. The app icon is taken from the official Kimi Code desktop app, for personal use only; replace it before distributing builds.

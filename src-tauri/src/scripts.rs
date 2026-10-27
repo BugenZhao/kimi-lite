@@ -33,7 +33,7 @@ fn variant(hide_gpus: bool) -> &'static str {
 fn prelude(hide_gpus: bool) -> String {
     format!(
         r#"umask 077
-state="${{XDG_STATE_HOME:-$HOME/.local/state}}/kimi-desktop"
+state="${{XDG_STATE_HOME:-$HOME/.local/state}}/kimi-lite"
 mkdir -p "$state" || {{ echo "{ERROR} cannot create $state"; exit 1; }}
 log="$state/{name}.log"
 pidf="$state/{name}.pid"

@@ -100,7 +100,7 @@
   let countdownTimer = 0;
   const ensureBanner = () => {
     if (root) return root;
-    host = document.createElement('kimi-desktop-banner');
+    host = document.createElement('kimi-lite-banner');
     host.style.cssText = 'position:fixed;inset:0 0 auto 0;z-index:2147483647;pointer-events:none;';
     root = host.attachShadow({ mode: 'closed' });
     root.innerHTML = `

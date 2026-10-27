@@ -271,7 +271,7 @@ fn control_dir() -> PathBuf {
     static DIR: OnceLock<PathBuf> = OnceLock::new();
     DIR.get_or_init(|| {
         let user = std::env::var("USER").unwrap_or_else(|_| "user".into());
-        let dir = PathBuf::from(format!("/tmp/kd-{user}"));
+        let dir = PathBuf::from(format!("/tmp/kimi-lite-{user}"));
         let _ = std::fs::create_dir_all(&dir);
         #[cfg(unix)]
         {
@@ -300,10 +300,10 @@ case "$prompt" in
   *) buttons='buttons {"Cancel", "OK"} default button "OK"' ; hidden="with hidden answer" ; answer="" ;;
 esac
 if [ -n "$answer" ]; then
-  /usr/bin/osascript -e 'on run argv' -e "display dialog (item 1 of argv) with title \"Kimi Desktop\" with icon caution $buttons" -e 'end run' "$prompt" >/dev/null || exit 1
+  /usr/bin/osascript -e 'on run argv' -e "display dialog (item 1 of argv) with title \"Kimi Lite\" with icon caution $buttons" -e 'end run' "$prompt" >/dev/null || exit 1
   echo "$answer"
 else
-  /usr/bin/osascript -e 'on run argv' -e "text returned of (display dialog (item 1 of argv) with title \"Kimi Desktop\" default answer \"\" $hidden $buttons)" -e 'end run' "$prompt"
+  /usr/bin/osascript -e 'on run argv' -e "text returned of (display dialog (item 1 of argv) with title \"Kimi Lite\" default answer \"\" $hidden $buttons)" -e 'end run' "$prompt"
 fi
 "#;
         std::fs::create_dir_all(dir).ok()?;
