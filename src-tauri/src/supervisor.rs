@@ -9,7 +9,6 @@ use std::time::Duration;
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, Url};
-use tokio::process::Child;
 use tokio::sync::mpsc;
 use tokio::time::Instant;
 
@@ -105,7 +104,7 @@ struct Connection {
     token: String,
     /// The ssh process carrying the tunnel (the master, or a dedicated
     /// tunnel on Windows); dropping it closes the tunnel.
-    tunnel: Option<Child>,
+    tunnel: Option<transport::SshProcess>,
 }
 
 enum Exit {
@@ -263,7 +262,7 @@ impl Runner {
         loop {
             let tunnel_exit = async {
                 match connection.tunnel.as_mut() {
-                    Some(child) => child.wait().await.ok(),
+                    Some(process) => process.exited().await,
                     None => std::future::pending().await,
                 }
             };
@@ -331,7 +330,13 @@ impl Ctx {
             Transport::Local => host.local_port.unwrap_or(DEFAULT_SERVER_PORT),
             Transport::Ssh { .. } => DEFAULT_SERVER_PORT,
         };
-        let master = transport.open_master().await?;
+        let master = transport
+            .open_master(|| {
+                self.update(|s| {
+                    s.message = "Waiting for SSH authentication… check your SSH agent (e.g. 1Password) for a prompt.".into()
+                })
+            })
+            .await?;
         let script = scripts::ensure(&host.command, host.hide_gpus, preferred, mode);
         let output = transport
             .run_script(&script, |line| {

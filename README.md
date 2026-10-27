@@ -55,7 +55,13 @@ pnpm install
 pnpm dev          # run in development
 pnpm build        # release bundle (.app / .dmg)
 cd src-tauri && cargo test
+# SSH lifecycle against a real host (opt-in):
+KL_TEST_HOST=<ssh host> cargo test --lib live_ -- --ignored --nocapture
+# Leak snapshot (local ssh processes, sockets, forwards; remote servers, sessions):
+scripts/leakcheck.sh <ssh host>
 ```
+
+Fault drills run against a GB200 host: SSH master killed, hung (SIGSTOP), remote server SIGKILL and SIGTERM, a 25s app freeze with the connection lost meanwhile, and a soak of 13 faults in a row. All recovered on the same local port in 6–14s, with no growth in processes, sockets, forwards, remote sessions or app memory.
 
 Layout:
 

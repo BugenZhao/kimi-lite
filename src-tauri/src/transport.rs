@@ -7,18 +7,40 @@ use std::sync::OnceLock;
 use std::time::Duration;
 
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::process::{Child, Command};
+use tokio::process::{Child, ChildStdin, Command};
 
 use crate::scripts;
 
 const SCRIPT_TIMEOUT: Duration = Duration::from_secs(90);
 const TUNNEL_TIMEOUT: Duration = Duration::from_secs(30);
+/// Past this, a connection is most likely waiting on authentication.
+const SLOW_CONNECT: Duration = Duration::from_secs(8);
 
 #[derive(Clone)]
 pub enum Transport {
     Local,
     /// `control` is the multiplexing socket of the master this app owns.
     Ssh { host: String, control: PathBuf },
+}
+
+/// An ssh process the app owns: the master (or a Windows tunnel). Dropping
+/// it kills the process; its lifeline pipe is held apart from the `Child`,
+/// because `Child::wait` closes stdin before waiting.
+pub struct SshProcess {
+    child: Child,
+    _lifeline: Option<ChildStdin>,
+}
+
+impl SshProcess {
+    fn new(mut child: Child) -> Self {
+        let lifeline = child.stdin.take();
+        Self { child, _lifeline: lifeline }
+    }
+
+    /// Resolves when the process exits.
+    pub async fn exited(&mut self) -> Option<std::process::ExitStatus> {
+        self.child.wait().await.ok()
+    }
 }
 
 pub struct ScriptResult {
@@ -114,31 +136,42 @@ impl Transport {
     /// on (one password/2FA prompt per connect). Its exit means the
     /// connection is gone. On Windows, where OpenSSH cannot multiplex, there
     /// is no master and each call connects on its own.
-    pub async fn open_master(&self) -> Result<Option<Child>, String> {
+    ///
+    /// The master's session runs `cat` on the host, reading a pipe this app
+    /// holds: if the app goes away for any reason (quit, crash, SIGKILL),
+    /// the pipe closes, `cat` ends, and the master and its forwards go with
+    /// it instead of lingering as orphans.
+    pub async fn open_master(&self, on_slow: impl FnOnce()) -> Result<Option<SshProcess>, String> {
         let Transport::Ssh { host, control } = self else { return Ok(None) };
         if cfg!(windows) {
             return Ok(None);
         }
         let _ = std::fs::remove_file(control);
         let mut child = base_ssh_command()
-            .args(["-M", "-N", "-T", "-o", "ControlMaster=yes", "-o", "ControlPersist=no", "-S"])
+            .args(["-M", "-T", "-o", "ControlMaster=yes", "-o", "ControlPersist=no", "-S"])
             .arg(control)
-            .arg(host)
-            .stdin(Stdio::null())
+            .args([host.as_str(), "cat >/dev/null"])
+            .stdin(Stdio::piped())
             .stdout(Stdio::null())
             .stderr(Stdio::piped())
             .kill_on_drop(true)
             .spawn()
             .map_err(|e| format!("Could not start ssh: {e}"))?;
-        let deadline = tokio::time::Instant::now() + SCRIPT_TIMEOUT;
+        let started = tokio::time::Instant::now();
+        let mut on_slow = Some(on_slow);
         loop {
             if let Ok(Some(status)) = child.try_wait() {
                 return Err(exit_reason(&mut child, status).await);
             }
             if control.exists() && self.control(&["-O", "check"]).await {
-                return Ok(Some(child));
+                return Ok(Some(SshProcess::new(child)));
             }
-            if tokio::time::Instant::now() > deadline {
+            if started.elapsed() > SLOW_CONNECT {
+                if let Some(notify) = on_slow.take() {
+                    notify();
+                }
+            }
+            if started.elapsed() > SCRIPT_TIMEOUT {
                 return Err("Timed out connecting.".into());
             }
             tokio::time::sleep(Duration::from_millis(150)).await;
@@ -148,7 +181,7 @@ impl Transport {
     /// Forwards `127.0.0.1:local_port` to the remote loopback `remote_port`:
     /// through the master when there is one (it lives and dies with it),
     /// otherwise as a dedicated tunnel process that is returned.
-    pub async fn forward(&self, local_port: u16, remote_port: u16) -> Result<Option<Child>, String> {
+    pub async fn forward(&self, local_port: u16, remote_port: u16) -> Result<Option<SshProcess>, String> {
         let Transport::Ssh { host, control } = self else { return Err("Local hosts need no tunnel.".into()) };
         let spec = format!("127.0.0.1:{local_port}:127.0.0.1:{remote_port}");
         let mut tunnel = None;
@@ -174,7 +207,7 @@ impl Transport {
                 }
             }
             if tokio::net::TcpStream::connect(("127.0.0.1", local_port)).await.is_ok() {
-                return Ok(tunnel);
+                return Ok(tunnel.map(SshProcess::new));
             }
             if tokio::time::Instant::now() > deadline {
                 return Err("SSH tunnel did not come up in time.".into());
@@ -283,6 +316,32 @@ fn control_dir() -> PathBuf {
     .clone()
 }
 
+/// Clears what an earlier run that did not exit cleanly may have left:
+/// orphaned ssh masters of ours (they would hold the hosts' stable ports)
+/// and their stale control sockets.
+pub fn collect_orphans() {
+    if cfg!(windows) {
+        return;
+    }
+    let dir = control_dir();
+    let marker = format!("-S {}/", dir.display());
+    if let Ok(out) = std::process::Command::new("ps").args(["-axo", "pid=,ppid=,args="]).output() {
+        for line in String::from_utf8_lossy(&out.stdout).lines() {
+            let mut fields = line.split_whitespace();
+            let (Some(pid), Some(ppid)) = (fields.next(), fields.next()) else { continue };
+            let args = fields.collect::<Vec<_>>().join(" ");
+            if ppid == "1" && args.starts_with("ssh ") && args.contains(&marker) {
+                let _ = std::process::Command::new("kill").arg(pid).status();
+            }
+        }
+    }
+    if let Ok(entries) = std::fs::read_dir(&dir) {
+        for entry in entries.flatten() {
+            let _ = std::fs::remove_file(entry.path());
+        }
+    }
+}
+
 static ASKPASS: OnceLock<Option<PathBuf>> = OnceLock::new();
 
 /// Installs a native password/passphrase prompt for ssh (macOS only).
@@ -371,4 +430,45 @@ pub fn free_port() -> Option<u16> {
 
 pub fn port_is_free(port: u16) -> bool {
     std::net::TcpListener::bind(("127.0.0.1", port)).is_ok()
+}
+
+/// Against a real host, opt-in:
+/// `KL_TEST_HOST=<ssh host> cargo test --lib live_ -- --ignored --nocapture`
+#[cfg(test)]
+mod live_tests {
+    use super::*;
+
+    #[tokio::test]
+    #[ignore]
+    async fn live_master_survives_idle_and_dies_with_its_owner() {
+        let Ok(host) = std::env::var("KL_TEST_HOST") else { return };
+        let transport = Transport::ssh(&host, "live-test");
+        let mut master = transport.open_master(|| eprintln!("waiting for auth…")).await.unwrap().unwrap();
+
+        // The forward works: talk to a remote loopback service through it
+        // (the host's sshd by default, or KL_TEST_PORT, e.g. an HTTP server).
+        let remote: u16 = std::env::var("KL_TEST_PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(22);
+        let port = free_port().unwrap();
+        assert!(transport.forward(port, remote).await.unwrap().is_none());
+        let mut stream = tokio::net::TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        stream.write_all(b"GET / HTTP/1.0\r\n\r\n").await.unwrap();
+        let mut head = [0u8; 4];
+        use tokio::io::AsyncReadExt;
+        stream.read_exact(&mut head).await.unwrap();
+        assert!(&head == b"SSH-" || &head == b"HTTP", "unexpected reply {head:?}");
+        drop(stream);
+
+        // Watched exactly like the supervisor does, an idle master stays up.
+        let idle = tokio::time::timeout(Duration::from_secs(20), master.exited()).await;
+        assert!(idle.is_err(), "master exited while idle: {idle:?}");
+
+        // Its owner going away closes the lifeline: the master follows, and
+        // the forwarded port is released.
+        let SshProcess { mut child, _lifeline } = master;
+        drop(_lifeline);
+        let gone = tokio::time::timeout(Duration::from_secs(20), child.wait()).await;
+        assert!(gone.is_ok(), "master outlived its lifeline");
+        assert!(port_is_free(port), "forward still listening");
+        eprintln!("master exited after lifeline closed: {:?}", gone.unwrap());
+    }
 }

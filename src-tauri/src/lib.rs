@@ -507,6 +507,7 @@ pub fn run() {
         .setup(|app| {
             let config_dir = app.path().app_config_dir()?;
             transport::install_askpass(&app.path().app_data_dir()?);
+            transport::collect_orphans();
             app.manage(AppState {
                 store: Mutex::new(Store::load(&config_dir)),
                 sessions: Mutex::new(HashMap::new()),
