@@ -13,6 +13,7 @@
     "allow-kd-set-onboarded",
     "allow-kd-show-window",
     "allow-kd-notify",
-    "allow-kd-retry"
+    "allow-kd-retry",
+    "allow-kd-host-menu"
   ]
 }

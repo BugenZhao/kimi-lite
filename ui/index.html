@@ -47,6 +47,16 @@
       .group-title:first-of-type { margin-top: 0; }
       .footer { display: flex; align-items: center; gap: 8px; max-width: 640px; margin-top: 16px; }
       .footer .spacer { flex: 1; }
+      .swatches { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+      .swatch {
+        width: 18px; height: 18px; border-radius: 50%; border: 0; padding: 0; cursor: pointer;
+        background: var(--c); box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.12);
+        transition: transform var(--duration) var(--ease-out);
+      }
+      .swatch:hover { transform: scale(1.12); }
+      .swatch.none { background: transparent; box-shadow: inset 0 0 0 1px var(--color-line-strong); position: relative; }
+      .swatch.none::after { content: ""; position: absolute; left: 3px; right: 3px; top: 8.5px; height: 1px; background: var(--color-text-quaternary); transform: rotate(-45deg); }
+      .swatch.selected { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--c, var(--color-line-strong)); }
       .error { color: var(--color-danger); font-size: var(--text-xs); }
       .error:empty { display: none; }
       .prose { color: var(--color-text-faint); font-size: var(--text-xs); max-width: 640px; margin: 16px 4px 0; line-height: 1.55; }
@@ -90,6 +100,10 @@
             <div class="row" id="r-ssh">
               <div class="text"><span class="label">SSH host</span><span class="hint">Uses your own OpenSSH, so ProxyJump, keys and agents work.</span></div>
               <div class="control"><input class="input" type="text" id="f-ssh" list="ssh-hosts" placeholder="alias or user@host" /></div>
+            </div>
+            <div class="row">
+              <div class="text"><span class="label">Color</span><span class="hint">Tints this host's sidebar and marks it in the host switcher.</span></div>
+              <div class="control"><div class="swatches" id="f-color"></div></div>
             </div>
             <div class="row">
               <div class="text"><span class="label">Kimi command</span><span class="hint">Executable on the host. Found on PATH or in ~/.kimi-code/bin.</span></div>
@@ -154,6 +168,25 @@
         stopped: 'Stopped',
       };
 
+      const PALETTE = ['#1783ff', '#8b5cf6', '#16a34a', '#f59e0b', '#f43f5e', '#0d9488', '#f97316', '#6366f1'];
+      let formColor = null;
+      function renderSwatches() {
+        const box = $('f-color');
+        box.textContent = '';
+        for (const color of [null, ...PALETTE]) {
+          const swatch = document.createElement('button');
+          swatch.type = 'button';
+          swatch.className = `swatch${color ? '' : ' none'}${color === formColor ? ' selected' : ''}`;
+          if (color) swatch.style.setProperty('--c', color);
+          swatch.title = color ?? 'No color';
+          swatch.onclick = () => {
+            formColor = color;
+            renderSwatches();
+          };
+          box.appendChild(swatch);
+        }
+      }
+
       let hosts = [];
       let settings = {};
       let selected = null; // host id, 'new' or 'settings'
@@ -174,7 +207,7 @@
           li.className = host.id === selected ? 'selected' : '';
           li.draggable = host.id !== 'local';
           li.dataset.id = host.id;
-          li.innerHTML = `<span class="glyph">${host.sshHost ? ICONS.ssh : ICONS.local}</span>
+          li.innerHTML = `<span class="glyph" style="${host.color ? `color:${host.color}` : ''}">${host.sshHost ? ICONS.ssh : ICONS.local}</span>
             <span class="name"></span><span class="dot ${host.status?.phase ?? ''}"></span>`;
           li.querySelector('.name').textContent = host.name;
           li.title = host.sshHost ?? 'This computer';
@@ -211,6 +244,7 @@
         const isNew = selected === 'new';
         const isLocal = host.id === 'local';
         $('head-glyph').innerHTML = isLocal ? ICONS.local : ICONS.ssh;
+        $('head-glyph').style.color = host.color || '';
         $('head-name').textContent = isNew ? 'New SSH Host' : host.name;
 
         const phase = host.status?.phase;
@@ -236,6 +270,9 @@
           $('f-ssh').value = host.sshHost ?? '';
           $('f-command').value = host.command;
           $('f-gpus').checked = host.hideGpus;
+          // New hosts get the next free palette color when saved.
+          formColor = isNew ? PALETTE.find((c) => !hosts.some((h) => h.color === c)) ?? null : host.color ?? null;
+          renderSwatches();
           $('error').textContent = '';
           if (isNew) $('f-ssh').focus();
         }
@@ -260,6 +297,7 @@
               sshHost: host?.id === 'local' ? null : $('f-ssh').value,
               command: $('f-command').value || 'kimi',
               hideGpus: $('f-gpus').checked,
+              color: formColor,
             },
           });
           delete $('f-name').dataset.touched;

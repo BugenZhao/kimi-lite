@@ -1,3 +1,4 @@
+mod chrome;
 mod config;
 mod menu;
 mod scripts;
@@ -60,6 +61,7 @@ fn open_host_window(app: &AppHandle, id: &str) -> Result<(), String> {
     let bridge_config = serde_json::json!({
         "hooks": integrated,
         "vibrancy": seamless && settings.vibrancy,
+        "host": host_identity(&host),
         "platform": std::env::consts::OS.replace("macos", "darwin").replace("windows", "win32"),
         // Height of the strip that drags the window (Kimi's header height).
         "dragStrip": if seamless { 48 } else { 0 },
@@ -107,7 +109,6 @@ fn open_host_window(app: &AppHandle, id: &str) -> Result<(), String> {
         builder
             .title_bar_style(tauri::TitleBarStyle::Overlay)
             .hidden_title(true)
-            .traffic_light_position(tauri::LogicalPosition::new(16.0, 17.0))
             .transparent(true)
             .effects(sidebar_material())
     } else {
@@ -116,12 +117,25 @@ fn open_host_window(app: &AppHandle, id: &str) -> Result<(), String> {
     .tabbing_identifier("kimi-host");
 
     let window = builder.build().map_err(|e| e.to_string())?;
+    if seamless {
+        chrome::align_traffic_lights(&window);
+    }
     let supervisor = Supervisor::spawn(app.clone(), &host);
     let generation = supervisor.generation;
     let app_handle = app.clone();
     let host_id = id.to_string();
+    let aligned = window.clone();
     window.on_window_event(move |event| match event {
-        WindowEvent::Focused(true) => clear_unread(&app_handle),
+        // AppKit puts the traffic lights back on these.
+        WindowEvent::Resized(_) | WindowEvent::ThemeChanged(_) | WindowEvent::Focused(false) if seamless => {
+            chrome::align_traffic_lights(&aligned);
+        }
+        WindowEvent::Focused(true) => {
+            clear_unread(&app_handle);
+            if seamless {
+                chrome::align_traffic_lights(&aligned);
+            }
+        }
         WindowEvent::CloseRequested { .. } => {
             app_handle.state::<AppState>().store.lock().unwrap().set_open(&host_id, false);
         }
@@ -168,10 +182,22 @@ pub fn show_hosts_window(app: &AppHandle, focus: Option<&str>) {
     let builder = builder
         .title_bar_style(tauri::TitleBarStyle::Overlay)
         .hidden_title(true)
-        .traffic_light_position(tauri::LogicalPosition::new(18.0, 22.0))
         .transparent(true)
         .effects(sidebar_material());
-    let _ = builder.build();
+    if let Ok(window) = builder.build() {
+        chrome::align_traffic_lights(&window);
+        let aligned = window.clone();
+        window.on_window_event(move |event| {
+            if matches!(event, WindowEvent::Resized(_) | WindowEvent::Focused(_) | WindowEvent::ThemeChanged(_)) {
+                chrome::align_traffic_lights(&aligned);
+            }
+        });
+    }
+}
+
+/// What the page bridge needs to show which host a window belongs to.
+pub fn host_identity(host: &HostConfig) -> serde_json::Value {
+    serde_json::json!({ "id": host.id, "name": host.name, "color": host.color })
 }
 
 #[cfg(target_os = "macos")]
@@ -225,18 +251,10 @@ fn unique_path(dir: &std::path::Path, suggested: &std::path::Path, url: &Url) ->
         .unwrap()
 }
 
-/// Mirrors connection state into the window title (Window menu, Mission
-/// Control, native tabs) without adding chrome to the page.
+/// Shows connection state on the page. The window title stays the host name:
+/// retitling makes AppKit re-lay out the title bar on every status change.
 pub fn on_status_changed(app: &AppHandle, status: &HostStatus) {
     let Some(window) = app.get_webview_window(&host_label(&status.id)) else { return };
-    let suffix = match status.phase {
-        supervisor::Phase::Ready => "",
-        supervisor::Phase::Connecting => " — Connecting…",
-        supervisor::Phase::Reconnecting => " — Reconnecting…",
-        supervisor::Phase::Failed => " — Not Connected",
-        supervisor::Phase::Stopped => " — Stopped",
-    };
-    let _ = window.set_title(&format!("{}{suffix}", status.name));
     // On a Kimi page, the bridge shows a small unobtrusive banner instead.
     if status.ever_ready || status.phase == supervisor::Phase::Ready {
         let payload = serde_json::to_string(status).unwrap_or_default();
@@ -310,6 +328,8 @@ fn save_host(app: AppHandle, state: tauri::State<AppState>, host: HostConfig) ->
     let saved = state.store.lock().unwrap().upsert(host)?;
     if let Some(window) = app.get_webview_window(&host_label(&saved.id)) {
         let _ = window.set_title(&saved.name);
+        chrome::align_traffic_lights(&window);
+        let _ = window.eval(format!("window.__kd && window.__kd.setHost({})", host_identity(&saved)));
     }
     menu::refresh(&app);
     Ok(saved)
@@ -461,6 +481,12 @@ fn kd_notify(app: AppHandle, window: WebviewWindow, title: String, body: Option<
     }
 }
 
+/// The host switcher, popped up from the host chip in Kimi's sidebar.
+#[tauri::command]
+fn kd_host_menu(app: AppHandle, window: WebviewWindow, x: f64, y: f64) {
+    menu::popup_hosts(&app, &window, x, y);
+}
+
 #[tauri::command]
 fn kd_retry(app: AppHandle, window: WebviewWindow) {
     if let Some(id) = host_id(window.label()) {
@@ -519,6 +545,7 @@ pub fn run() {
             kd_show_window,
             kd_notify,
             kd_retry,
+            kd_host_menu,
         ])
         .build(tauri::generate_context!())
         .expect("error while building the app");

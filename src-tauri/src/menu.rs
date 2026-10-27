@@ -1,8 +1,11 @@
 //! Native menu bar. Page-level actions (New Chat, Settings) are forwarded
 //! to the web UI through the optional `kimiDesktop.onMenuAction` hook.
 
-use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
-use tauri::{AppHandle, Manager, Wry};
+use tauri::menu::{IconMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::{AppHandle, LogicalPosition, Manager, WebviewWindow, Wry};
+
+use crate::chrome;
+use crate::config::HostConfig;
 
 use crate::supervisor::Command;
 use crate::AppState;
@@ -69,7 +72,8 @@ fn build(app: &AppHandle) -> tauri::Result<(Menu<Wry>, Submenu<Wry>)> {
         true,
         &[
             &item(app, "page:new-chat", "New Chat", Some("CmdOrCtrl+N"))?,
-            &item(app, "hosts", "Open Host…", Some("CmdOrCtrl+Shift+O"))?,
+            &item(app, "switch-host", "Switch Host…", Some("CmdOrCtrl+Shift+O"))?,
+            &item(app, "new-host", "New SSH Host…", None)?,
             &sep()?,
             &PredefinedMenuItem::close_window(app, None)?,
         ],
@@ -124,14 +128,44 @@ fn build(app: &AppHandle) -> tauri::Result<(Menu<Wry>, Submenu<Wry>)> {
     window.append(&sep()?)?;
     let hosts = app.state::<AppState>().store.lock().unwrap().hosts.clone();
     for (index, host) in hosts.iter().enumerate() {
-        let accelerator = (index < 9).then(|| format!("CmdOrCtrl+{}", index + 1));
-        window.append(&item(app, &format!("{HOST_PREFIX}{}", host.id), &host.name, accelerator.as_deref())?)?;
+        window.append(&host_item(app, host, index)?)?;
     }
     window.append(&sep()?)?;
     window.append(&PredefinedMenuItem::bring_all_to_front(app, None)?)?;
 
     let menu = Menu::with_items(app, &[&app_menu, &file, &edit, &view, &host, &window])?;
     Ok((menu, window))
+}
+
+/// A host entry: its color dot, name, and ⌘1…⌘9 for the first nine.
+fn host_item(app: &AppHandle, host: &HostConfig, index: usize) -> tauri::Result<IconMenuItem<Wry>> {
+    let accelerator = (index < 9).then(|| format!("CmdOrCtrl+{}", index + 1));
+    IconMenuItem::with_id(
+        app,
+        format!("{HOST_PREFIX}{}", host.id),
+        &host.name,
+        true,
+        Some(chrome::dot_icon(host.color.as_deref())),
+        accelerator.as_deref(),
+    )
+}
+
+/// Native host switcher, shown at a point in `window` (logical pixels).
+pub fn popup_hosts(app: &AppHandle, window: &WebviewWindow, x: f64, y: f64) {
+    let build = || -> tauri::Result<Menu<Wry>> {
+        let menu = Menu::new(app)?;
+        let hosts = app.state::<AppState>().store.lock().unwrap().hosts.clone();
+        for (index, host) in hosts.iter().enumerate() {
+            menu.append(&host_item(app, host, index)?)?;
+        }
+        menu.append(&PredefinedMenuItem::separator(app)?)?;
+        menu.append(&item(app, "new-host", "New SSH Host…", None)?)?;
+        menu.append(&item(app, "hosts", "Hosts…", None)?)?;
+        Ok(menu)
+    };
+    if let Ok(menu) = build() {
+        let _ = window.popup_menu_at(&menu, LogicalPosition::new(x, y));
+    }
 }
 
 fn handle(app: &AppHandle, id: &str) {
@@ -149,6 +183,13 @@ fn handle(app: &AppHandle, id: &str) {
     }
     match id {
         "hosts" => crate::show_hosts_window(app, None),
+        "new-host" => crate::show_hosts_window(app, Some("new")),
+        "switch-host" => match crate::focused_window(app) {
+            // Under the host chip in Kimi's sidebar header.
+            Some(window) if window.label().starts_with("host-") => popup_hosts(app, &window, 96.0, 40.0),
+            Some(window) => popup_hosts(app, &window, 24.0, 40.0),
+            None => crate::show_hosts_window(app, None),
+        },
         "reload" => {
             if let Some(window) = crate::focused_window(app) {
                 let _ = window.reload();

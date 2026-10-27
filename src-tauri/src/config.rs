@@ -24,6 +24,9 @@ pub struct HostConfig {
     /// web UI keeps its origin (and therefore its storage and live socket).
     #[serde(default)]
     pub local_port: Option<u16>,
+    /// Identity color (`#rrggbb`): sidebar tint, menu dots, host chip.
+    #[serde(default)]
+    pub color: Option<String>,
 }
 
 fn default_command() -> String {
@@ -45,6 +48,11 @@ impl HostConfig {
                 && host.chars().all(|c| c.is_ascii_alphanumeric() || "_.@:-".contains(c));
             if !ok {
                 return Err("SSH host contains unsupported characters. Use an alias from ~/.ssh/config for advanced options.".into());
+            }
+        }
+        if let Some(color) = &self.color {
+            if crate::chrome::parse_hex(color).is_none() {
+                return Err("Color must look like #1783ff.".into());
             }
         }
         let ok = !self.command.is_empty()
@@ -117,6 +125,7 @@ impl Store {
                     command: default_command(),
                     hide_gpus: false,
                     local_port: None,
+                    color: None,
                 },
             );
         }
@@ -142,6 +151,7 @@ impl Store {
         host.name = host.name.trim().to_string();
         host.command = host.command.trim().to_string();
         host.ssh_host = host.ssh_host.map(|h| h.trim().to_string()).filter(|h| !h.is_empty());
+        host.color = host.color.map(|c| c.trim().to_lowercase()).filter(|c| !c.is_empty());
         if host.id == LOCAL_ID {
             host.ssh_host = None;
         } else if host.ssh_host.is_none() {
@@ -158,11 +168,24 @@ impl Store {
                 if host.id.is_empty() {
                     host.id = new_id();
                 }
+                if host.color.is_none() {
+                    host.color = Some(self.next_color());
+                }
                 self.hosts.push(host.clone());
             }
         }
         self.save();
         Ok(host)
+    }
+
+    /// The first palette color no host uses yet (cycling when all are taken).
+    fn next_color(&self) -> String {
+        let used: Vec<_> = self.hosts.iter().filter_map(|h| h.color.as_deref()).collect();
+        crate::chrome::PALETTE
+            .iter()
+            .find(|c| !used.contains(c))
+            .unwrap_or(&crate::chrome::PALETTE[self.hosts.len() % crate::chrome::PALETTE.len()])
+            .to_string()
     }
 
     pub fn remove(&mut self, id: &str) {

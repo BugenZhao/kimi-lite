@@ -57,22 +57,23 @@
       background: transparent !important;
     }
     html.kl-vibrancy { --color-sidebar-bg: transparent; }`;
-  // Only once Kimi's layout is on the page: until then the transparent page
-  // would show nothing but glass.
+  // Runs `fn` once Kimi's layout is on the page (now, or when it appears).
   const layoutReady = () => !!document.querySelector('#app .app');
-  let waiting = null;
+  function whenLayout(fn) {
+    if (layoutReady()) return fn();
+    const observer = new MutationObserver(() => {
+      if (!layoutReady()) return;
+      observer.disconnect();
+      fn();
+    });
+    observer.observe(document.documentElement || document, { childList: true, subtree: true });
+  }
+
+  // Glass only once Kimi's layout is there: until then the transparent page
+  // would show nothing but glass.
   const applyVibrancy = () => {
     const root = document.documentElement;
     if (!root) return;
-    if (vibrancy && !layoutReady()) {
-      if (!waiting) {
-        waiting = new MutationObserver(() => layoutReady() && applyVibrancy());
-        waiting.observe(root, { childList: true, subtree: true });
-      }
-      return;
-    }
-    waiting?.disconnect();
-    waiting = null;
     if (!document.getElementById('kl-vibrancy-style')) {
       const style = document.createElement('style');
       style.id = 'kl-vibrancy-style';
@@ -81,7 +82,96 @@
     }
     root.classList.toggle('kl-vibrancy', vibrancy);
   };
-  if (config.platform === 'darwin') applyVibrancy();
+  if (config.platform === 'darwin') whenLayout(applyVibrancy);
+
+  // ---- Host identity: sidebar tint and host chip ----------------------------
+  // Both hang off Kimi's sidebar (`.side`); without it they simply stay away.
+  let identity = config.host || null;
+  const TINT_CSS = `
+    html.kl-tint #app .side { background-image: linear-gradient(var(--kl-tint), var(--kl-tint)); }`;
+  const sidebar = () => document.querySelector('#app .side');
+  const applyTint = () => {
+    const root = document.documentElement;
+    if (!root) return;
+    if (!document.getElementById('kl-tint-style')) {
+      const style = document.createElement('style');
+      style.id = 'kl-tint-style';
+      style.textContent = TINT_CSS;
+      (document.head || root).appendChild(style);
+    }
+    const color = identity && identity.color;
+    root.classList.toggle('kl-tint', !!color);
+    if (color) root.style.setProperty('--kl-tint', `color-mix(in srgb, ${color} 9%, transparent)`);
+  };
+
+  let chip = null;
+  let chipRoot = null;
+  const ensureChip = () => {
+    if (chip) return;
+    chip = document.createElement('kimi-lite-chip');
+    chip.style.cssText = 'position:fixed;top:12px;left:0;z-index:2147483646;display:none;cursor:pointer;';
+    chipRoot = chip.attachShadow({ mode: 'closed' });
+    chipRoot.innerHTML = `
+      <style>
+        :host { all: initial; }
+        button {
+          display: flex; align-items: center; gap: 6px; height: 24px; max-width: 100%;
+          padding: 0 6px 0 8px; border: 0; border-radius: 6px; background: transparent; cursor: pointer;
+          font: 500 12.5px/1 var(--font-ui, "Schibsted Grotesk Variable", -apple-system, system-ui, sans-serif);
+          color: var(--color-text-muted, rgba(0,0,0,.6));
+        }
+        button:hover { background: var(--color-hover, rgba(0,0,0,.04)); color: var(--color-text, rgba(0,0,0,.9)); }
+        .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--chip-color, #9ca3af); }
+        .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        svg { width: 10px; height: 10px; flex: none; opacity: .6; }
+      </style>
+      <button type="button" title="Switch host (⇧⌘O)"><span class="dot"></span><span class="name"></span>
+        <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4l2.5 2.5L7.5 4"/></svg>
+      </button>`;
+    chipRoot.querySelector('button').addEventListener('click', () => {
+      const rect = chip.getBoundingClientRect();
+      invoke('kd_host_menu', { x: rect.left, y: rect.bottom + 4 }).catch(() => {});
+    });
+    document.documentElement.appendChild(chip);
+  };
+  const placeChip = () => {
+    if (!identity || !config.dragStrip) return;
+    ensureChip();
+    if (!chip.isConnected) document.documentElement.appendChild(chip);
+    chipRoot.querySelector('.name').textContent = identity.name;
+    chipRoot.querySelector('button').style.setProperty('--chip-color', identity.color || '#9ca3af');
+    const side = sidebar();
+    const rect = side && side.getBoundingClientRect();
+    // Right-aligned in the sidebar header, clear of the traffic lights and
+    // Kimi's collapse button (which end around x = 110).
+    const room = rect ? rect.right - 10 - 116 : 0;
+    if (!rect || rect.width < 180 || room < 60) {
+      chip.style.display = 'none';
+      return;
+    }
+    chip.style.display = 'block';
+    chip.style.maxWidth = `${room}px`;
+    chip.style.left = `${rect.right - 10 - Math.min(chip.offsetWidth, room)}px`;
+  };
+
+  let observedSide = null;
+  const resizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(placeChip) : null;
+  const refreshIdentity = () => {
+    applyTint();
+    const side = sidebar();
+    if (side !== observedSide) {
+      if (observedSide) resizeObserver?.unobserve(observedSide);
+      if (side) resizeObserver?.observe(side);
+      observedSide = side;
+    }
+    placeChip();
+  };
+  if (identity) {
+    // Kimi re-renders its layout as it boots and when the sidebar toggles.
+    whenLayout(refreshIdentity);
+    setInterval(() => sidebar() !== observedSide && refreshIdentity(), 1000);
+    window.addEventListener('resize', placeChip);
+  }
 
   // ---- Optional Kimi desktop hooks ----------------------------------------
   const menuListeners = new Set();
@@ -102,7 +192,11 @@
         invoke('kd_set_theme', { theme: String(theme) }).catch(noop);
       },
       getVibrancy: () => Promise.resolve(vibrancy),
-      setVibrancy(enabled) {
+      setHost(next) {
+      identity = next;
+      refreshIdentity();
+    },
+    setVibrancy(enabled) {
         invoke('kd_set_vibrancy', { enabled: !!enabled }).catch(noop);
       },
       // Remembered app-wide, so other hosts skip the first-run screens.
@@ -119,7 +213,8 @@
   if (config.dragStrip) {
     const INTERACTIVE =
       'a,button,input,textarea,select,label,summary,video,audio,iframe,[contenteditable]:not([contenteditable="false"]),' +
-      '[role=button],[role=link],[role=tab],[role=menuitem],[role=option],[role=checkbox],[role=switch],[role=textbox],[role=slider],[draggable=true]';
+      '[role=button],[role=link],[role=tab],[role=menuitem],[role=option],[role=checkbox],[role=switch],[role=textbox],[role=slider],[draggable=true],' +
+      'kimi-lite-chip,kimi-lite-banner';
     const isDragTarget = (event) => {
       if (event.button !== 0 || event.clientY > config.dragStrip) return false;
       if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return false;

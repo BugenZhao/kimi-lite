@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-kd-host-menu"
+description = "Enables the kd_host_menu command without any pre-configured scope."
+commands.allow = ["kd_host_menu"]
+
+[[permission]]
+identifier = "deny-kd-host-menu"
+description = "Denies the kd_host_menu command without any pre-configured scope."
+commands.deny = ["kd_host_menu"]

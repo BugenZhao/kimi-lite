@@ -18,6 +18,7 @@ fn main() {
             "kd_show_window",
             "kd_notify",
             "kd_retry",
+            "kd_host_menu",
         ]),
     ))
     .expect("failed to run tauri-build");
