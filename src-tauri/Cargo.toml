@@ -1,6 +1,6 @@
 [package]
 name = "kimi-lite"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Lightweight native desktop app for Kimi Code's web UI, local or over SSH"
 license = "MIT"
