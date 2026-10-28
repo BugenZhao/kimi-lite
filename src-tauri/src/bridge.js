@@ -299,6 +299,7 @@
   let root = null;
   let hideTimer = 0;
   let countdownTimer = 0;
+  let showFrame = 0;
   const ensureBanner = () => {
     if (root) return root;
     host = document.createElement('kimi-lite-banner');
@@ -352,6 +353,7 @@
     const pill = r.querySelector('.pill');
     clearTimeout(hideTimer);
     clearInterval(countdownTimer);
+    cancelAnimationFrame(showFrame);
     const ok = status.phase === 'ready';
     pill.classList.toggle('ok', ok);
     // "Retry now" only makes sense while waiting for a scheduled retry.
@@ -369,8 +371,13 @@
       tick();
       countdownTimer = setInterval(tick, 1000);
     }
-    requestAnimationFrame(() => pill.classList.add('show'));
-    if (ok) hideTimer = setTimeout(() => pill.classList.remove('show'), 1600);
+    // Frames are paused while the window is hidden or covered, so the
+    // "Reconnected" pill starts its hide timer only once it is on screen;
+    // otherwise the timer runs out first and the pill stays up for good.
+    showFrame = requestAnimationFrame(() => {
+      pill.classList.add('show');
+      if (ok) hideTimer = setTimeout(() => pill.classList.remove('show'), 1600);
+    });
   };
 
   let disconnected = false;
