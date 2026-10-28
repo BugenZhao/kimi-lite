@@ -122,7 +122,8 @@
         }
         button:hover { background: var(--color-hover, rgba(0,0,0,.04)); color: var(--color-text, rgba(0,0,0,.9)); }
         .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--chip-color, #9ca3af); }
-        .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        /* Room for descenders: the ellipsis needs overflow hidden. */
+        .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4; }
         svg { width: 10px; height: 10px; flex: none; opacity: .6; }
       </style>
       <button type="button" title="Switch host (⇧⌘O)"><span class="dot"></span><span class="name"></span>
@@ -328,7 +329,7 @@
         .ok .dot { background:#22c55e; }
         .spin { animation: pulse 1.2s ease-in-out infinite; }
         @keyframes pulse { 50% { opacity:.35; } }
-        .msg { white-space:nowrap; max-width:60vw; overflow:hidden; text-overflow:ellipsis; }
+        .msg { white-space:nowrap; max-width:60vw; overflow:hidden; text-overflow:ellipsis; line-height:1.4; }
         .muted { color: var(--color-text-faint, rgba(0,0,0,.45)); font-variant-numeric: tabular-nums; }
         button {
           font: inherit; color: inherit; cursor: default; height: 24px;
