@@ -84,6 +84,25 @@ fn open_host_window(app: &AppHandle, id: &str) -> Result<(), String> {
             open_external(&url);
             tauri::webview::NewWindowResponse::Deny
         })
+        .on_page_load({
+            // The init script carries the settings from when the window was
+            // made; reloads and reconnects get the current ones.
+            let app = app.clone();
+            let id = id.to_string();
+            move |webview, payload| {
+                if payload.event() != tauri::webview::PageLoadEvent::Finished {
+                    return;
+                }
+                let state = app.state::<AppState>();
+                let store = state.store.lock().unwrap();
+                let Some(host) = store.get(&id) else { return };
+                let vibrancy = seamless && store.settings.vibrancy;
+                let _ = webview.eval(format!(
+                    "window.__kd && (window.__kd.setHost({}), window.__kd.setVibrancy({vibrancy}))",
+                    host_identity(host)
+                ));
+            }
+        })
         .on_download({
             let app = app.clone();
             move |_webview, event| {

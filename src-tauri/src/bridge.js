@@ -166,12 +166,16 @@
     }
     placeChip();
   };
-  if (identity) {
+  let watchingIdentity = false;
+  const watchIdentity = () => {
+    if (watchingIdentity) return;
+    watchingIdentity = true;
     // Kimi re-renders its layout as it boots and when the sidebar toggles.
     whenLayout(refreshIdentity);
     setInterval(() => sidebar() !== observedSide && refreshIdentity(), 1000);
     window.addEventListener('resize', placeChip);
-  }
+  };
+  if (identity) watchIdentity();
 
   // ---- Optional Kimi desktop hooks ----------------------------------------
   const menuListeners = new Set();
@@ -192,11 +196,7 @@
         invoke('kd_set_theme', { theme: String(theme) }).catch(noop);
       },
       getVibrancy: () => Promise.resolve(vibrancy),
-      setHost(next) {
-      identity = next;
-      refreshIdentity();
-    },
-    setVibrancy(enabled) {
+      setVibrancy(enabled) {
         invoke('kd_set_vibrancy', { enabled: !!enabled }).catch(noop);
       },
       // Remembered app-wide, so other hosts skip the first-run screens.
@@ -394,6 +394,12 @@
     setVibrancy(enabled) {
       vibrancy = !!enabled;
       applyVibrancy();
+    },
+    // Host edits (name, color) apply to open windows without a reopen.
+    setHost(next) {
+      identity = next || null;
+      if (identity) watchIdentity();
+      refreshIdentity();
     },
     menu(action) {
       for (const listener of menuListeners) {
