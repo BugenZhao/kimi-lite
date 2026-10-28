@@ -1,0 +1,77 @@
+name: Release
+
+# Pushing a `v*` tag builds the app and drafts a GitHub release with it.
+# Running the workflow by hand builds the same files as a workflow artifact.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  macos-arm64:
+    runs-on: macos-15
+    env:
+      # Ad-hoc signature: Apple Silicon refuses unsigned bundles outright.
+      # There is no Developer ID yet, so Gatekeeper still asks on first open.
+      APPLE_SIGNING_IDENTITY: "-"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Check the tag matches the app version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          version="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match version ${version} in tauri.conf.json"
+            exit 1
+          fi
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Test
+        working-directory: src-tauri
+        run: cargo test --locked
+
+      - name: Build
+        run: pnpm tauri build --bundles app,dmg
+
+      - name: Collect files
+        run: |
+          version="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          bundle=src-tauri/target/release/bundle
+          mkdir dist
+          cp "$bundle"/dmg/*.dmg "dist/Kimi-Lite_${version}_aarch64.dmg"
+          ditto -c -k --keepParent "$bundle/macos/Kimi Lite.app" "dist/Kimi-Lite_${version}_aarch64.app.zip"
+          (cd dist && shasum -a 256 -- * > SHA256SUMS)
+          ls -l dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kimi-lite-macos-arm64
+          path: dist/*
+
+      - name: Draft release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --draft --generate-notes --title "Kimi Lite ${GITHUB_REF_NAME#v}"

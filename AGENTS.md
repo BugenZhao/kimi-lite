@@ -102,6 +102,16 @@ Not allowed: reading `~/.kimi-code` internals (server registry, tokens, session 
 - Generated shell must stay POSIX `sh` and pass `sh -n`. Strings embedded into scripts must not contain quotes or `$`.
 - Commit messages: imperative subject, body explaining the why.
 
+## Releases
+
+`.github/workflows/release.yml` builds on an Apple Silicon runner (`macos-15`): tests, then the `.app` and `.dmg`, ad-hoc signed (`APPLE_SIGNING_IDENTITY=-`; there is no Developer ID or notarization yet). To release, bump `version` in `src-tauri/tauri.conf.json` (and `Cargo.toml`, `package.json`), commit, then push a matching tag:
+
+```sh
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+The workflow refuses a tag that doesn't match the app version, and drafts a GitHub release with the `.dmg`, a zipped `.app` and `SHA256SUMS`. Review and publish the draft by hand. Running the workflow manually (Actions → Release → Run workflow) builds the same files as a workflow artifact without a release.
+
 ## Icons
 
 The PNG and ICO files in `src-tauri/icons/` were generated from `src-tauri/icons/source.png` with `pnpm tauri icon`. `icon.icns` ships as-is, and that command overwrites it, so restore it afterwards (`git checkout src-tauri/icons/icon.icns`).

@@ -21,7 +21,17 @@ Kimi Lite starts `kimi web` where you want it, keeps a private tunnel to it, and
 
 ## Install
 
-There are no prebuilt releases yet. To build from source you need Rust (stable), Node.js 22+ and pnpm:
+Download the `.dmg` (Apple Silicon) from [Releases](https://github.com/BugenZhao/kimi-lite/releases) and drag Kimi Lite to Applications.
+
+The app is not notarized yet, so macOS blocks the first launch. Either open it from **System Settings → Privacy & Security → Open Anyway**, or clear the quarantine flag:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/Kimi Lite.app"
+```
+
+### Build from source
+
+You need Rust (stable), Node.js 22+ and pnpm:
 
 ```sh
 git clone https://github.com/BugenZhao/kimi-lite.git
