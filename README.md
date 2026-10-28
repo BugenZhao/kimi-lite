@@ -22,7 +22,7 @@ Kimi Lite starts `kimi web` where you want it, keeps a private tunnel to it, and
 
 ## Install
 
-Download the `.dmg` (Apple Silicon) from [Releases](https://github.com/BugenZhao/kimi-lite/releases) and drag Kimi Lite to Applications. Releases are signed with a Developer ID and notarized by Apple.
+Download the `.dmg` (Apple Silicon) from [Releases](https://github.com/BugenZhao/kimi-lite/releases) and drag Kimi Lite to Applications. Releases are signed with a Developer ID and notarized by Apple. Kimi Lite then keeps itself up to date: it checks GitHub Releases in the background and offers to install new versions, or use **Kimi Lite → Check for Updates…**. Automatic checks can be turned off in Settings.
 
 ### Build from source
 

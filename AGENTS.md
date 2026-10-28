@@ -27,6 +27,8 @@ src-tauri/src/
   chrome.rs      traffic-light placement (AppKit), host color dots, palette
   menu.rs        menu bar and the host switcher popup
   config.rs      hosts.json and settings
+  fetch.rs       provider model lists fetched on the host (`fetchProviderModels`)
+  updates.rs     self-updates from GitHub Releases: background checks, Check for Updates…, alert
   ssh_config.rs  Host aliases from ~/.ssh/config (follows Include)
 src-tauri/capabilities/
   app.json       what the app's own pages may call
@@ -112,14 +114,21 @@ Not allowed: reading `~/.kimi-code` internals (server registry, tokens, session 
 | `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD` | Base64 `.p12` with the Developer ID Application certificate and its key, and its password |
 | `APPLE_SIGNING_IDENTITY` | `Developer ID Application: <name> (<team>)` |
 | `APPLE_API_KEY`, `APPLE_API_ISSUER`, `APPLE_API_KEY_P8` | App Store Connect API key (Developer role) for `notarytool`: key ID, issuer ID, `.p8` contents |
+| `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Updater key (minisign) that signs the update archive; its public half is `plugins.updater.pubkey` in `tauri.conf.json` |
 
-Without them (forks), the build falls back to an ad-hoc signature and skips notarization. To release, bump `version` in `src-tauri/tauri.conf.json` (and `Cargo.toml`, `package.json`), commit, then push a matching tag:
+Without them (forks), the build falls back to an ad-hoc signature and skips notarization and the update files. To release, bump `version` in `src-tauri/tauri.conf.json` (and `Cargo.toml`, `package.json`), commit, then push a matching tag:
 
 ```sh
 git tag v0.1.0 && git push origin v0.1.0
 ```
 
-The workflow refuses a tag that doesn't match the app version, and publishes a GitHub release with the `.dmg`, a zipped `.app` and `SHA256SUMS`. The short commit hash is the bundle's build number (About shows `0.1.0 (abc1234)`) and is part of the release title and file names. Running the workflow manually (Actions → Release → Run workflow) builds the same files as a workflow artifact without a release.
+The workflow refuses a tag that doesn't match the app version, and publishes a GitHub release with the `.dmg`, a zipped `.app`, the update archive (`.app.tar.gz` and its `.sig`), `latest.json` and `SHA256SUMS`. The release notes, shown in the app's update alert too, are the commit subjects since the previous tag (minus "Release …" commits), so write subjects for users. The short commit hash is the bundle's build number (About shows `0.1.0 (abc1234)`) and is part of the release title and file names. Running the workflow manually (Actions → Release → Run workflow) builds the same files as a workflow artifact without a release.
+
+### Updates
+
+Installed copies poll `releases/latest/download/latest.json` (20s after launch, then every 6 hours, unless turned off in Settings) and on **Check for Updates…**. An update is downloaded and its signature checked before the alert offers **Install and Relaunch / Later / Skip This Version**; a skipped version is only offered again by a manual check. Losing the updater key means installed copies can no longer update themselves, so it is backed up next to the Apple credentials.
+
+Local builds don't make update files (`createUpdaterArtifacts` is set by the workflow only, since it needs the private key). To test the flow end to end, build a newer version with update files (`TAURI_SIGNING_PRIVATE_KEY*` set, `--config '{"version":"X","bundle":{"createUpdaterArtifacts":true}}'`), serve its archive and a `latest.json` on loopback, and build the copy under test with `plugins.updater.endpoints` pointing there and `dangerousInsecureTransportProtocol: true`.
 
 ## Icons
 

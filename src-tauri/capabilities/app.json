@@ -17,6 +17,8 @@
     "allow-host-status",
     "allow-host-action",
     "allow-get-settings",
-    "allow-set-settings"
+    "allow-set-settings",
+    "allow-check-for-updates",
+    "core:app:allow-version"
   ]
 }

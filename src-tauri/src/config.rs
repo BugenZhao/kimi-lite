@@ -81,6 +81,12 @@ pub struct Settings {
     /// its own origin) is told so instead of asking again.
     #[serde(default)]
     pub onboarded: bool,
+    /// Look for new versions of the app in the background.
+    #[serde(default = "enabled")]
+    pub check_for_updates: bool,
+    /// A version the user chose to skip: background checks don't offer it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skipped_version: Option<String>,
 }
 
 fn enabled() -> bool {
@@ -89,7 +95,7 @@ fn enabled() -> bool {
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { desktop_integration: true, vibrancy: true, onboarded: false }
+        Self { desktop_integration: true, vibrancy: true, onboarded: false, check_for_updates: true, skipped_version: None }
     }
 }
 

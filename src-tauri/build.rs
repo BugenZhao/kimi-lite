@@ -12,6 +12,7 @@ fn main() {
             "host_action",
             "get_settings",
             "set_settings",
+            "check_for_updates",
             "kd_set_theme",
             "kd_set_vibrancy",
             "kd_set_onboarded",

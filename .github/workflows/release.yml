@@ -1,7 +1,9 @@
 name: Release
 
-# Pushing a `v*` tag builds the app and publishes a GitHub release with it.
-# Running the workflow by hand builds the same files as a workflow artifact.
+# Pushing a `v*` tag builds the app and publishes a GitHub release with it,
+# including the signed update archive and `latest.json` that installed copies
+# check for updates. Running the workflow by hand builds the same files as a
+# workflow artifact.
 on:
   push:
     tags: ["v*"]
@@ -24,8 +26,13 @@ jobs:
       # open.
       SIGNED: ${{ secrets.APPLE_CERTIFICATE != '' }}
       APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY || '-' }}
+      # Signs the update archive; the app only installs updates signed by it.
+      UPDATER: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Tags, for the release notes since the previous one.
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
 
@@ -86,14 +93,17 @@ jobs:
 
       # The commit goes into CFBundleVersion: About shows "0.1.0 (abc1234)".
       # With APPLE_API_KEY(_PATH) and APPLE_API_ISSUER set, Tauri notarizes
-      # the app and staples the ticket.
+      # the app and staples the ticket, then packs the update archive.
       - name: Build
         env:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-        run: >-
-          pnpm tauri build --bundles app,dmg
-          --config '{"bundle":{"macOS":{"bundleVersion":"${{ steps.version.outputs.commit }}"}}}'
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          COMMIT: ${{ steps.version.outputs.commit }}
+        run: |
+          config="{\"bundle\":{\"createUpdaterArtifacts\":${UPDATER},\"macOS\":{\"bundleVersion\":\"${COMMIT}\"}}}"
+          pnpm tauri build --bundles app,dmg --config "$config"
 
       - name: Notarize the disk image
         if: env.SIGNED == 'true'
@@ -112,12 +122,43 @@ jobs:
 
       - name: Collect files
         env:
+          APP_VERSION: ${{ steps.version.outputs.app }}
           VERSION: ${{ steps.version.outputs.app }}-${{ steps.version.outputs.commit }}
         run: |
           bundle=src-tauri/target/release/bundle
           mkdir dist
           cp "$bundle"/dmg/*.dmg "dist/Kimi-Lite_${VERSION}_aarch64.dmg"
           ditto -c -k --keepParent "$bundle/macos/Kimi Lite.app" "dist/Kimi-Lite_${VERSION}_aarch64.app.zip"
+
+          # Release notes: the commits since the previous tag.
+          previous="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)"
+          if [ -n "$previous" ]; then
+            git log --no-merges --format='- %s' "$previous..HEAD" | grep -v '^- Release ' > notes.md || true
+          fi
+          [ -s notes.md ] || echo "- First release." > notes.md
+
+          if [ "$UPDATER" = true ]; then
+            archive="Kimi-Lite_${VERSION}_aarch64.app.tar.gz"
+            cp "$bundle/macos/Kimi Lite.app.tar.gz" "dist/$archive"
+            cp "$bundle/macos/Kimi Lite.app.tar.gz.sig" "dist/$archive.sig"
+            # The archive must hold the notarized, stapled app.
+            if [ "$SIGNED" = true ]; then
+              mkdir -p "$RUNNER_TEMP/check" && tar -xzf "dist/$archive" -C "$RUNNER_TEMP/check"
+              xcrun stapler validate "$RUNNER_TEMP/check/Kimi Lite.app"
+              spctl --assess --type execute --verbose=2 "$RUNNER_TEMP/check/Kimi Lite.app"
+            fi
+            url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${archive}"
+            node -e '
+              const fs = require("fs");
+              const [version, url, sig] = process.argv.slice(1);
+              fs.writeFileSync("dist/latest.json", JSON.stringify({
+                version,
+                notes: fs.readFileSync("notes.md", "utf8").trim(),
+                pub_date: new Date().toISOString(),
+                platforms: { "darwin-aarch64": { signature: fs.readFileSync(sig, "utf8").trim(), url } },
+              }, null, 2) + "\n");
+            ' "$APP_VERSION" "$url" "dist/$archive.sig"
+          fi
           (cd dist && shasum -a 256 -- * > SHA256SUMS)
           ls -l dist
 
@@ -131,7 +172,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TITLE: Kimi Lite ${{ steps.version.outputs.app }} (${{ steps.version.outputs.commit }})
-        run: gh release create "$GITHUB_REF_NAME" dist/* --generate-notes --title "$TITLE"
+        run: gh release create "$GITHUB_REF_NAME" dist/* --notes-file notes.md --title "$TITLE"
 
       - name: Remove the signing keychain
         if: always() && env.SIGNED == 'true'

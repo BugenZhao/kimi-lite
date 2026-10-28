@@ -155,6 +155,19 @@
           </div>
         </div>
         </div>
+        <div class="sec">
+        <h3 class="sec-title">Updates</h3>
+        <div class="group">
+          <div class="row">
+            <div class="text"><span class="label">Check for updates automatically</span><span class="hint">Look for new versions on GitHub at launch and every few hours, and offer to install them.</span></div>
+            <div class="control"><input class="switch" type="checkbox" id="s-updates" /></div>
+          </div>
+          <div class="row">
+            <div class="text"><span class="label">Kimi Lite <span id="s-version"></span></span><span class="hint">Also in the app menu: Kimi Lite → Check for Updates…</span></div>
+            <div class="control"><button class="btn" type="button" id="s-check">Check Now</button></div>
+          </div>
+        </div>
+        </div>
         <p class="prose">
           Kimi Code keeps running on each host after its window closes or the connection drops, so agents keep working.
           Use Stop Kimi Code on a host to shut it down.
@@ -340,12 +353,19 @@
       $('settings').onclick = () => select('settings');
 
       const saveSettings = () => {
-        settings = { ...settings, desktopIntegration: $('s-integration').checked, vibrancy: $('s-vibrancy').checked };
+        settings = {
+          ...settings,
+          desktopIntegration: $('s-integration').checked,
+          vibrancy: $('s-vibrancy').checked,
+          checkForUpdates: $('s-updates').checked,
+        };
         $('s-vibrancy').disabled = !settings.desktopIntegration;
         invoke('set_settings', { settings });
       };
       $('s-integration').onchange = saveSettings;
       $('s-vibrancy').onchange = saveSettings;
+      $('s-updates').onchange = saveSettings;
+      $('s-check').onclick = () => invoke('check_for_updates');
 
       // Drag to reorder (the local host stays first).
       let dragged = null;
@@ -392,6 +412,8 @@
         settings = loaded;
         $('s-integration').checked = settings.desktopIntegration;
         $('s-vibrancy').checked = settings.vibrancy;
+        $('s-updates').checked = settings.checkForUpdates;
+        window.__TAURI__.app.getVersion().then((v) => ($('s-version').textContent = v)).catch(() => {});
         $('s-vibrancy').disabled = !settings.desktopIntegration;
         $('r-vibrancy').hidden = !navigator.userAgent.includes('Mac');
         $('ssh-hosts').innerHTML = sshHosts.map((h) => `<option value="${h.replace(/"/g, '&quot;')}">`).join('');

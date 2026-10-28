@@ -6,6 +6,7 @@ mod scripts;
 mod ssh_config;
 mod supervisor;
 mod transport;
+mod updates;
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -416,6 +417,11 @@ fn set_settings(app: AppHandle, state: tauri::State<AppState>, settings: config:
     if settings.vibrancy != previous.vibrancy {
         set_vibrancy(&app, &state, settings.vibrancy);
     }
+    if settings.check_for_updates != previous.check_for_updates {
+        let mut store = state.store.lock().unwrap();
+        store.settings.check_for_updates = settings.check_for_updates;
+        store.save();
+    }
     if settings.desktop_integration == previous.desktop_integration {
         return;
     }
@@ -503,6 +509,11 @@ fn kd_notify(app: AppHandle, window: WebviewWindow, title: String, body: Option<
     }
 }
 
+#[tauri::command]
+fn check_for_updates(app: AppHandle) {
+    updates::check_now(&app);
+}
+
 /// Lists a custom provider's models for Kimi's settings page, from the host.
 #[tauri::command]
 async fn kd_fetch_provider_models(app: AppHandle, window: WebviewWindow, request: fetch::Request) -> serde_json::Value {
@@ -536,6 +547,7 @@ fn truncate(text: &str, max: usize) -> String {
 pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let config_dir = app.path().app_config_dir()?;
             transport::install_askpass(&app.path().app_data_dir()?);
@@ -548,6 +560,7 @@ pub fn run() {
             });
             let handle = app.handle().clone();
             menu::install(&handle)?;
+            updates::spawn_background(handle.clone());
 
             // Restore the host windows that were open at quit.
             let reopen = app.state::<AppState>().store.lock().unwrap().open_hosts.clone();
@@ -572,6 +585,7 @@ pub fn run() {
             host_action,
             get_settings,
             set_settings,
+            check_for_updates,
             kd_set_theme,
             kd_set_vibrancy,
             kd_set_onboarded,

@@ -52,6 +52,7 @@ fn build(app: &AppHandle) -> tauri::Result<(Menu<Wry>, Submenu<Wry>)> {
         true,
         &[
             &PredefinedMenuItem::about(app, Some(&format!("About {name}")), None)?,
+            &item(app, "check-updates", "Check for Updates…", None)?,
             &sep()?,
             &item(app, "page:open-settings", "Settings…", Some("CmdOrCtrl+,"))?,
             &item(app, "hosts", "Hosts…", Some("CmdOrCtrl+Shift+H"))?,
@@ -183,6 +184,7 @@ fn handle(app: &AppHandle, id: &str) {
     }
     match id {
         "hosts" => crate::show_hosts_window(app, None),
+        "check-updates" => crate::updates::check_now(app),
         "new-host" => crate::show_hosts_window(app, Some("new")),
         "switch-host" => match crate::focused_window(app) {
             // Under the host chip in Kimi's sidebar header.
