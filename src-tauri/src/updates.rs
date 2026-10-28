@@ -18,6 +18,9 @@ const CHECK_EVERY: Duration = Duration::from_secs(6 * 60 * 60);
 const NOTES_LIMIT: usize = 1200;
 
 static CHECKING: AtomicBool = AtomicBool::new(false);
+/// Set by "Check for Updates…" while a background check holds an update
+/// back until the app is in use: show it now instead.
+static ASK_NOW: AtomicBool = AtomicBool::new(false);
 
 /// Starts the background checks (each skipped while turned off in Settings).
 pub fn spawn_background(app: AppHandle) {
@@ -41,8 +44,12 @@ pub fn check_now(app: &AppHandle) {
 
 async fn check(app: &AppHandle, interactive: bool) {
     if CHECKING.swap(true, Ordering::SeqCst) {
+        if interactive {
+            ASK_NOW.store(true, Ordering::SeqCst);
+        }
         return;
     }
+    ASK_NOW.store(false, Ordering::SeqCst);
     let result = run(app, interactive).await;
     CHECKING.store(false, Ordering::SeqCst);
     if let Err(error) = result {
@@ -74,8 +81,8 @@ async fn run(app: &AppHandle, interactive: bool) -> Result<(), String> {
     let bytes = update.download(|_, _| {}, || {}).await.map_err(|e| e.to_string())?;
     if !interactive {
         // Don't pull a background app forward; wait until it is in use.
-        while crate::focused_window(app).is_none() {
-            tokio::time::sleep(Duration::from_secs(10)).await;
+        while crate::focused_window(app).is_none() && !ASK_NOW.swap(false, Ordering::SeqCst) {
+            tokio::time::sleep(Duration::from_secs(1)).await;
         }
     }
 
