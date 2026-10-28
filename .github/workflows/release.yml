@@ -28,6 +28,9 @@ jobs:
       APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY || '-' }}
       # Signs the update archive; the app only installs updates signed by it.
       UPDATER: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+      # stapler and spctl talk to Apple's ticket service, whose connection
+      # drops now and then on CI runners: retry them.
+      RETRY: retry() { for i in 1 2 3 4 5; do "$@" && return 0; [ "$i" = 5 ] && return 1; sleep $((i * 15)); done; }
     steps:
       - uses: actions/checkout@v4
         with:
@@ -111,35 +114,33 @@ jobs:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         run: |
+          eval "$RETRY"
           bundle=src-tauri/target/release/bundle
           dmg="$(ls "$bundle"/dmg/*.dmg)"
           codesign --force --timestamp --sign "$APPLE_SIGNING_IDENTITY" "$dmg"
           xcrun notarytool submit "$dmg" --key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY" \
             --issuer "$APPLE_API_ISSUER" --wait --timeout 30m
-          # Notarization can be accepted while fetching the ticket from
-          # Apple's CDN still fails now and then: retry the staple.
-          for attempt in 1 2 3 4 5; do
-            xcrun stapler staple "$dmg" && break
-            [ "$attempt" = 5 ] && exit 1
-            sleep $((attempt * 15))
-          done
-          spctl --assess --type execute --verbose=2 "$bundle/macos/Kimi Lite.app"
-          spctl --assess --type open --context context:primary-signature --verbose=2 "$dmg"
+          retry xcrun stapler staple "$dmg"
+          retry spctl --assess --type execute --verbose=2 "$bundle/macos/Kimi Lite.app"
+          retry spctl --assess --type open --context context:primary-signature --verbose=2 "$dmg"
 
       - name: Collect files
         env:
           APP_VERSION: ${{ steps.version.outputs.app }}
           VERSION: ${{ steps.version.outputs.app }}-${{ steps.version.outputs.commit }}
         run: |
+          eval "$RETRY"
           bundle=src-tauri/target/release/bundle
           mkdir dist
           cp "$bundle"/dmg/*.dmg "dist/Kimi-Lite_${VERSION}_aarch64.dmg"
           ditto -c -k --keepParent "$bundle/macos/Kimi Lite.app" "dist/Kimi-Lite_${VERSION}_aarch64.app.zip"
 
-          # Release notes: the commits since the previous tag.
+          # Release notes: the commits since the previous tag that change the
+          # app (not only CI).
           previous="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)"
           if [ -n "$previous" ]; then
-            git log --no-merges --format='- %s' "$previous..HEAD" | grep -v '^- Release ' > notes.md || true
+            git log --no-merges --format='- %s' "$previous..HEAD" -- . ':(exclude).github' \
+              | grep -v '^- Release ' > notes.md || true
           fi
           [ -s notes.md ] || echo "- First release." > notes.md
 
@@ -150,8 +151,8 @@ jobs:
             # The archive must hold the notarized, stapled app.
             if [ "$SIGNED" = true ]; then
               mkdir -p "$RUNNER_TEMP/check" && tar -xzf "dist/$archive" -C "$RUNNER_TEMP/check"
-              xcrun stapler validate "$RUNNER_TEMP/check/Kimi Lite.app"
-              spctl --assess --type execute --verbose=2 "$RUNNER_TEMP/check/Kimi Lite.app"
+              retry xcrun stapler validate "$RUNNER_TEMP/check/Kimi Lite.app"
+              retry spctl --assess --type execute --verbose=2 "$RUNNER_TEMP/check/Kimi Lite.app"
             fi
             url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${archive}"
             node -e '
