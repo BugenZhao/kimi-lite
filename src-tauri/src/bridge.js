@@ -565,7 +565,26 @@
   });
   window.WebSocket = LiteWebSocket;
 
+  // ---- In-page navigation for kimi-lite:// links ----------------------------
+  // A page that routes on `popstate` can switch to a session without a full
+  // reload (seconds of loading screens). Whether it does is seen from its own
+  // listener; without one, links load the page as before.
+  let routesOnPopState = false;
+  const addWindowListener = window.addEventListener;
+  window.addEventListener = function (type, ...rest) {
+    if (type === 'popstate') routesOnPopState = true;
+    return addWindowListener.call(this, type, ...rest);
+  };
+  const openPath = (path) => {
+    if (location.pathname === path) return;
+    const url = path + location.search;
+    if (!routesOnPopState && !window.onpopstate) return location.assign(url);
+    history.pushState(null, '', url);
+    window.dispatchEvent(new PopStateEvent('popstate', { state: null }));
+  };
+
   window.__kd = {
+    openPath,
     status(status) {
       if (status.phase === 'ready') {
         if (disconnected) window.__kd.reconnected(status);

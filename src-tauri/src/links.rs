@@ -163,7 +163,8 @@ fn go(app: &AppHandle, host: &str, session: &str) {
     let ready = state.sessions.lock().unwrap().get(host).is_some_and(|s| s.status().phase == Phase::Ready);
     match app.get_webview_window(&crate::host_label(host)) {
         Some(window) if ready => {
-            let _ = window.eval(format!("location.assign({} + location.search)", serde_json::json!(path)));
+            let path = serde_json::json!(path);
+            let _ = window.eval(format!("window.__kd ? window.__kd.openPath({path}) : location.assign({path} + location.search)"));
             let _ = window.unminimize();
             let _ = window.show();
             let _ = window.set_focus();
