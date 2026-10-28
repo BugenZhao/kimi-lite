@@ -23,7 +23,7 @@ src-tauri/src/
   transport.rs   local login shell / OpenSSH master + forwards, askpass, probes, orphan cleanup
   scripts.rs     POSIX sh run on hosts: ensure / stop the server, GPU mask
   bridge.js      injected into Kimi pages: notifications, desktop hooks, glass, cursor, drag strip,
-                 host chip, reconnect banner
+                 host chip, reconnect banner, realtime sockets held while a host is unreachable
   chrome.rs      traffic-light placement (AppKit), host color dots, palette
   menu.rs        menu bar and the host switcher popup
   config.rs      hosts.json and settings
@@ -49,6 +49,7 @@ scripts/         leakcheck.sh
 | `GET /` answers 2xx | Health probe |
 | The page shows a session at `/sessions/<session-id>` | `kimi-lite://sessions/<id>` links open there; Copy Session Link reads it from the window URL |
 | Web standards: `Notification`, the `online` event | Polyfilled or dispatched by the bridge |
+| `WebSocket` to the page's own origin | Wrapped by the bridge: while the banner says the host is unreachable, a new socket waits and connects once the host is back (no backoff wait, no failing retries); otherwise only the first `error` of a run of failures reaches the page, after a 2s grace in which the banner can take over. Kimi toasts every `error` and reconnects on `close`. |
 | `?kimi_desktop=1&platform=…&kimi_vibrancy=1&kimi_onboarded=1` and `window.kimiDesktop` hooks (`onMenuAction`, `showWindow`, `setTheme`, `getVibrancy`/`setVibrancy`, `setOnboarded`, `onUpdateStatus`/`getUpdateStatus`, `fetchProviderModels`) | Kimi's own opt-in desktop presentation. Once `kimiDesktop` exists, the page calls `onUpdateStatus`/`getUpdateStatus` unconditionally, so they must exist. The page served by `kimi web` 2.3 no longer reads `kimi_vibrancy` or calls the vibrancy hooks (the official app's own UI build still does); the frosted-sidebar shim covers it. |
 | `fetchProviderModels({url, headers, timeoutMs})` → `{ok, status, body}` or `{ok: false, kind}` | "Fetch model list" for a custom provider. `fetch.rs` runs it with `curl` on the host (http(s) GET only, config passed base64-encoded so keys stay off command lines): no CORS, and the host's own network. Without the hook the page falls back to `fetch()`. |
 | Frosted-sidebar shim: `--color-sidebar-bg`, `#app`, `.app`, `.side` | Cosmetic, applied only once `#app .app` exists; degrades to opaque |

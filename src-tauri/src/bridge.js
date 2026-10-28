@@ -441,7 +441,130 @@
     });
   };
 
+  // ---- Realtime sockets ----------------------------------------------------
+  // Kimi shows a toast for every WebSocket `error` and retries with a growing
+  // backoff (up to 30s), so a short outage stacks up toasts and the page can
+  // stay offline long after the host is back. While the banner says the host
+  // is unreachable, a socket to Kimi's own server waits instead and connects
+  // as soon as the host is back. Otherwise only the first error of a run of
+  // failures reaches the page, and only if the banner doesn't take over
+  // within a moment. `close` always follows an error and is what Kimi
+  // reconnects on, so dropping errors changes nothing else.
   let disconnected = false;
+  let failing = false;
+  const NativeWebSocket = window.WebSocket;
+  const ERROR_GRACE = 2000;
+  const held = new Set();
+  const replayed = new WeakSet();
+  const ownServer = (url) => {
+    try {
+      return new URL(url, location.href).host === location.host;
+    } catch {
+      return false;
+    }
+  };
+  // Registered before the page's own handlers, so it can stop them.
+  const quiet = (ws) => {
+    ws.addEventListener('open', () => (failing = false));
+    ws.addEventListener('error', (event) => {
+      if (replayed.has(event)) return;
+      event.stopImmediatePropagation();
+      if (failing || disconnected) return;
+      failing = true;
+      setTimeout(() => {
+        if (disconnected) return;
+        const again = new Event('error');
+        replayed.add(again);
+        ws.dispatchEvent(again);
+      }, ERROR_GRACE);
+    });
+    return ws;
+  };
+  const STATES = ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'];
+  class HeldSocket extends EventTarget {
+    #ws = null;
+    #closed = false;
+    #binaryType = 'blob';
+    constructor(url, protocols) {
+      super();
+      this.url = new URL(url, location.href).href;
+      this.protocols = protocols;
+      held.add(this);
+    }
+    get readyState() {
+      return this.#ws ? this.#ws.readyState : this.#closed ? 3 : 0;
+    }
+    get protocol() {
+      return this.#ws ? this.#ws.protocol : '';
+    }
+    get extensions() {
+      return this.#ws ? this.#ws.extensions : '';
+    }
+    get bufferedAmount() {
+      return this.#ws ? this.#ws.bufferedAmount : 0;
+    }
+    get binaryType() {
+      return this.#binaryType;
+    }
+    set binaryType(value) {
+      this.#binaryType = value;
+      if (this.#ws) this.#ws.binaryType = value;
+    }
+    send(data) {
+      if (!this.#ws) throw new DOMException('Still in CONNECTING state.', 'InvalidStateError');
+      this.#ws.send(data);
+    }
+    close(code, reason) {
+      if (this.#ws) return this.#ws.close(code, reason);
+      if (this.#closed) return;
+      this.#closed = true;
+      held.delete(this);
+      setTimeout(() => this.dispatchEvent(new CloseEvent('close', { code: 1006, wasClean: false })));
+    }
+    connect() {
+      held.delete(this);
+      if (this.#closed || this.#ws) return;
+      const ws = (this.#ws = quiet(new NativeWebSocket(this.url, this.protocols)));
+      ws.binaryType = this.#binaryType;
+      ws.addEventListener('open', () => this.dispatchEvent(new Event('open')));
+      ws.addEventListener('message', (e) =>
+        this.dispatchEvent(new MessageEvent('message', { data: e.data, origin: e.origin, lastEventId: e.lastEventId })),
+      );
+      ws.addEventListener('error', () => this.dispatchEvent(new Event('error')));
+      ws.addEventListener('close', (e) =>
+        this.dispatchEvent(new CloseEvent('close', { code: e.code, reason: e.reason, wasClean: e.wasClean })),
+      );
+    }
+  }
+  for (const type of ['open', 'message', 'error', 'close']) {
+    const handlers = new WeakMap();
+    Object.defineProperty(HeldSocket.prototype, 'on' + type, {
+      get() {
+        return handlers.get(this) || null;
+      },
+      set(handler) {
+        const old = handlers.get(this);
+        if (old) this.removeEventListener(type, old);
+        handlers.delete(this);
+        if (typeof handler === 'function') {
+          handlers.set(this, handler);
+          this.addEventListener(type, handler);
+        }
+      },
+    });
+  }
+  function LiteWebSocket(url, protocols) {
+    if (!new.target) throw new TypeError("Failed to construct 'WebSocket': Please use the 'new' operator.");
+    if (!ownServer(url)) return new NativeWebSocket(url, protocols);
+    return disconnected ? new HeldSocket(url, protocols) : quiet(new NativeWebSocket(url, protocols));
+  }
+  LiteWebSocket.prototype = NativeWebSocket.prototype;
+  STATES.forEach((name, value) => {
+    LiteWebSocket[name] = value;
+    HeldSocket.prototype[name] = value;
+  });
+  window.WebSocket = LiteWebSocket;
+
   window.__kd = {
     status(status) {
       if (status.phase === 'ready') {
@@ -454,6 +577,8 @@
     reconnected(status) {
       if (!disconnected) return;
       disconnected = false;
+      failing = false;
+      for (const socket of [...held]) socket.connect();
       render({ phase: 'ready', name: (status && status.name) || document.title || 'host' });
       // Standard signal: lets the app re-open its socket right away instead
       // of waiting out its own backoff.
