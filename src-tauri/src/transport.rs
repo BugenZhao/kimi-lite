@@ -29,12 +29,22 @@ pub enum Transport {
 pub struct SshProcess {
     child: Child,
     _lifeline: Option<ChildStdin>,
+    /// The master's control socket: ssh cannot unlink it when killed.
+    control: Option<PathBuf>,
+}
+
+impl Drop for SshProcess {
+    fn drop(&mut self) {
+        if let Some(control) = &self.control {
+            let _ = std::fs::remove_file(control);
+        }
+    }
 }
 
 impl SshProcess {
-    fn new(mut child: Child) -> Self {
+    fn new(mut child: Child, control: Option<PathBuf>) -> Self {
         let lifeline = child.stdin.take();
-        Self { child, _lifeline: lifeline }
+        Self { child, _lifeline: lifeline, control }
     }
 
     /// Resolves when the process exits.
@@ -164,7 +174,7 @@ impl Transport {
                 return Err(exit_reason(&mut child, status).await);
             }
             if control.exists() && self.control(&["-O", "check"]).await {
-                return Ok(Some(SshProcess::new(child)));
+                return Ok(Some(SshProcess::new(child, Some(control.clone()))));
             }
             if started.elapsed() > SLOW_CONNECT {
                 if let Some(notify) = on_slow.take() {
@@ -207,7 +217,7 @@ impl Transport {
                 }
             }
             if tokio::net::TcpStream::connect(("127.0.0.1", local_port)).await.is_ok() {
-                return Ok(tunnel.map(SshProcess::new));
+                return Ok(tunnel.map(|child| SshProcess::new(child, None)));
             }
             if tokio::time::Instant::now() > deadline {
                 return Err("SSH tunnel did not come up in time.".into());
@@ -464,9 +474,8 @@ mod live_tests {
 
         // Its owner going away closes the lifeline: the master follows, and
         // the forwarded port is released.
-        let SshProcess { mut child, _lifeline } = master;
-        drop(_lifeline);
-        let gone = tokio::time::timeout(Duration::from_secs(20), child.wait()).await;
+        drop(master._lifeline.take());
+        let gone = tokio::time::timeout(Duration::from_secs(20), master.child.wait()).await;
         assert!(gone.is_ok(), "master outlived its lifeline");
         assert!(port_is_free(port), "forward still listening");
         eprintln!("master exited after lifeline closed: {:?}", gone.unwrap());

@@ -61,7 +61,7 @@ KL_TEST_HOST=<ssh host> cargo test --lib live_ -- --ignored --nocapture
 scripts/leakcheck.sh <ssh host>
 ```
 
-Fault drills run against a GB200 host: SSH master killed, hung (SIGSTOP), remote server SIGKILL and SIGTERM, a 25s app freeze with the connection lost meanwhile, and a soak of 13 faults in a row. All recovered on the same local port in 6–14s, with no growth in processes, sockets, forwards, remote sessions or app memory.
+Fault drills run against a GB200 host: SSH master killed, hung (SIGSTOP), remote server SIGKILL and SIGTERM, a 25s app freeze with the connection lost meanwhile, soaks of 7 and 13 faults in a row, Stop/Start, closing and reopening the host window, Quit and relaunch, and `kill -9` of the app itself. Every fault recovered on the same local port (2–14s) and reused the running server where one existed; after Quit or a crash no ssh process, socket, forward or remote session is left behind, and nothing grows across faults.
 
 Layout:
 
