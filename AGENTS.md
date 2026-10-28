@@ -111,7 +111,7 @@ Not allowed: reading `~/.kimi-code` internals (server registry, tokens, session 
 
 ## Releases
 
-`.github/workflows/release.yml` builds on an Apple Silicon runner (`macos-15`): tests, then the `.app` and `.dmg`, signed with a Developer ID (hardened runtime), notarized and stapled. Tauri notarizes the app; the workflow then signs, notarizes and staples the disk image and checks both with `spctl`. Repository secrets:
+`.github/workflows/release.yml` builds on an Apple Silicon runner (`macos-26`: apps linked against an older SDK don't get the macOS 26+ design): tests, then the `.app` and `.dmg`, signed with a Developer ID (hardened runtime), notarized and stapled. Tauri notarizes the app; the workflow then signs, notarizes and staples the disk image and checks both with `spctl`. Repository secrets:
 
 | Secret | What |
 | --- | --- |

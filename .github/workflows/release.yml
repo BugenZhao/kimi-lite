@@ -18,7 +18,10 @@ concurrency:
 
 jobs:
   macos-arm64:
-    runs-on: macos-15
+    # macOS 26+ gives the Liquid Glass look (glass traffic lights and all)
+    # only to apps linked against its SDK; older ones run in a compatibility
+    # mode with the previous design. This image's default Xcode has it.
+    runs-on: macos-26
     env:
       # With the Developer ID secrets the app is signed, notarized and
       # stapled. Without them (forks) it gets an ad-hoc signature, which
@@ -97,6 +100,9 @@ jobs:
       # The commit goes into CFBundleVersion: About shows "0.1.0 (abc1234)".
       # With APPLE_API_KEY(_PATH) and APPLE_API_ISSUER set, Tauri notarizes
       # the app and staples the ticket, then packs the update archive.
+      - name: Show the SDK
+        run: xcodebuild -version && xcrun --show-sdk-version
+
       - name: Build
         env:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
