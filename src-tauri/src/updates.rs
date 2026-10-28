@@ -95,6 +95,11 @@ async fn run(app: &AppHandle, interactive: bool) -> Result<(), String> {
     match crate::chrome::alert(app, &title, &text, &["Install and Relaunch", "Later", "Skip This Version"]).await {
         Some(0) => {
             update.install(bytes).map_err(|e| e.to_string())?;
+            // Let this instance's SSH masters and tunnels go first: the new
+            // one takes the same control sockets and local ports, and would
+            // otherwise briefly load pages through tunnels about to vanish.
+            app.state::<AppState>().sessions.lock().unwrap().clear();
+            tokio::time::sleep(Duration::from_millis(800)).await;
             app.restart();
         }
         Some(2) => {
