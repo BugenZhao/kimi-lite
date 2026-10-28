@@ -29,7 +29,7 @@ pub struct AppState {
     sessions: Mutex<HashMap<String, Supervisor>>,
     zoom: Mutex<HashMap<String, f64>>,
     unread: Mutex<i64>,
-    /// A page to show once a host's window connects (from a `kimi://` link).
+    /// A page to show once a host's window connects (from a `kimi-lite://` link).
     pending_paths: Mutex<HashMap<String, String>>,
 }
 

@@ -110,7 +110,7 @@ pub struct Store {
     #[serde(default)]
     pub open_hosts: Vec<String>,
     /// Which host each recently linked session lives on (most recent first),
-    /// so `kimi://` links to them open without asking the hosts.
+    /// so `kimi-lite://` links to them open without asking the hosts.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub sessions: Vec<SessionHost>,
     #[serde(skip)]

@@ -243,7 +243,7 @@ impl Runner {
     async fn serve(&mut self, mut connection: Connection) -> Exit {
         let settings = self.ctx.app.state::<AppState>().store.lock().unwrap().settings.clone();
         let mut url = kimi_url(connection.port, &connection.token, &settings);
-        // A `kimi://` link asked for a page on this host (a session).
+        // A `kimi-lite://` link asked for a page on this host (a session).
         let target = self.ctx.app.state::<AppState>().pending_paths.lock().unwrap().remove(&self.ctx.id);
         if let Some(path) = &target {
             url.set_path(path);
