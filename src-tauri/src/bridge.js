@@ -124,7 +124,20 @@
       if (accent) root.style.setProperty(name, accent[name]);
       else root.style.removeProperty(name);
     }
+    // A thin line in the host color along the window's top edge: visible
+    // whatever the sidebar does.
+    if (color && !line) {
+      line = document.createElement('kimi-lite-line');
+      line.style.cssText =
+        'position:fixed;top:0;left:0;right:0;height:2px;z-index:2147483645;pointer-events:none;display:block;';
+    }
+    if (line) {
+      line.style.background = color || 'transparent';
+      if (color && !line.isConnected) root.appendChild(line);
+      if (!color) line.remove();
+    }
   };
+  let line = null;
 
   let chip = null;
   let chipRoot = null;
@@ -165,16 +178,43 @@
     chipRoot.querySelector('button').style.setProperty('--chip-color', identity.color || '#9ca3af');
     const side = sidebar();
     const rect = side && side.getBoundingClientRect();
-    // Right-aligned in the sidebar header, clear of the traffic lights and
-    // Kimi's collapse button (which end around x = 110).
-    const room = rect ? rect.right - 10 - 116 : 0;
-    if (!rect || rect.width < 180 || room < 60) {
+    chip.style.display = 'block';
+    if (rect && rect.width >= 180 && rect.right >= 180) {
+      // Right-aligned in the sidebar header, clear of the traffic lights and
+      // Kimi's collapse button (which end around x = 110).
+      const room = rect.right - 10 - 116;
+      chip.style.maxWidth = `${room}px`;
+      chip.style.left = `${rect.right - 10 - Math.min(chip.offsetWidth, room)}px`;
+      return;
+    }
+    // Sidebar collapsed: right-aligned in the main header, just left of the
+    // icon buttons Kimi keeps at its right end (more appear with the right
+    // panel open), where the header is otherwise empty.
+    if (window.innerWidth < 720) {
       chip.style.display = 'none';
       return;
     }
-    chip.style.display = 'block';
-    chip.style.maxWidth = `${room}px`;
-    chip.style.left = `${rect.right - 10 - Math.min(chip.offsetWidth, room)}px`;
+    chip.style.maxWidth = '200px';
+    chip.style.left = `${headerButtonsLeft() - 8 - Math.min(chip.offsetWidth, 200)}px`;
+  };
+  // Left edge of the run of buttons at the right end of the header, found by
+  // hit-testing leftwards from the window edge (no class names involved).
+  const headerButtonsLeft = () => {
+    const y = config.dragStrip / 2;
+    let edge = window.innerWidth - 8;
+    chip.style.pointerEvents = 'none';
+    for (let i = 0; i < 8; i++) {
+      let hit = null;
+      for (const dx of [4, 10, 16]) {
+        const el = document.elementFromPoint(edge - dx, y);
+        hit = el && el.closest('button,a,[role=button],[role=tab]');
+        if (hit) break;
+      }
+      if (!hit) break;
+      edge = Math.min(edge, hit.getBoundingClientRect().left);
+    }
+    chip.style.pointerEvents = '';
+    return edge;
   };
 
   let observedSide = null;
@@ -195,7 +235,10 @@
     watchingIdentity = true;
     // Kimi re-renders its layout as it boots and when the sidebar toggles.
     whenLayout(refreshIdentity);
-    setInterval(() => sidebar() !== observedSide && refreshIdentity(), 1000);
+    // Also catches a sidebar that collapses by moving rather than resizing.
+    setInterval(() => (sidebar() !== observedSide ? refreshIdentity() : placeChip()), 1000);
+    // Panels open and close on clicks: follow them without waiting a second.
+    window.addEventListener('click', () => [60, 320].forEach((ms) => setTimeout(placeChip, ms)), true);
     window.addEventListener('resize', placeChip);
   };
   if (identity) watchIdentity();
