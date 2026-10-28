@@ -88,7 +88,12 @@
   // Both hang off Kimi's sidebar (`.side`); without it they simply stay away.
   let identity = config.host || null;
   const TINT_CSS = `
-    html.kl-tint #app .side { background-image: linear-gradient(var(--kl-tint), var(--kl-tint)); }`;
+    html.kl-tint #app .side { background-image: linear-gradient(var(--kl-tint), var(--kl-tint)); }
+    html.kl-tint ::selection { background-color: color-mix(in srgb, var(--color-accent) 26%, transparent); }`;
+  const ACCENT_PROPS = [
+    '--kl-tint', '--color-accent', '--color-accent-hover', '--color-accent-soft', '--color-accent-bd',
+    '--color-code-selection', '--p-selection', 'accent-color',
+  ];
   const sidebar = () => document.querySelector('#app .side');
   const applyTint = () => {
     const root = document.documentElement;
@@ -101,7 +106,24 @@
     }
     const color = identity && identity.color;
     root.classList.toggle('kl-tint', !!color);
-    if (color) root.style.setProperty('--kl-tint', `color-mix(in srgb, ${color} 9%, transparent)`);
+    // Kimi's accent (buttons, links, focus rings, toggles), text selection and
+    // native form controls follow the host color too. Kimi declares these on
+    // <html> per color scheme, so inline values win in light and dark alike;
+    // hover leans toward the text color, i.e. darker in light, lighter in dark.
+    const accent = color && {
+      '--kl-tint': `color-mix(in srgb, ${color} 9%, transparent)`,
+      '--color-accent': color,
+      '--color-accent-hover': `color-mix(in oklch, ${color} 88%, var(--color-text, #000))`,
+      '--color-accent-soft': `color-mix(in srgb, ${color} 12%, transparent)`,
+      '--color-accent-bd': `color-mix(in srgb, ${color} 27%, transparent)`,
+      '--color-code-selection': `color-mix(in srgb, ${color} 30%, transparent)`,
+      '--p-selection': `color-mix(in srgb, ${color} 20%, transparent)`,
+      'accent-color': color,
+    };
+    for (const name of ACCENT_PROPS) {
+      if (accent) root.style.setProperty(name, accent[name]);
+      else root.style.removeProperty(name);
+    }
   };
 
   let chip = null;
@@ -290,6 +312,9 @@
       'mousedown',
       (event) => {
         if (!isDragTarget(event)) return;
+        // Otherwise WebKit also starts a text selection, which sweeps over
+        // the page while the window moves under the pointer.
+        event.preventDefault();
         if (event.detail === 2) {
           invoke('plugin:window|internal_toggle_maximize').catch(() => {});
         } else {

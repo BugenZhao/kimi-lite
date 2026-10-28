@@ -116,7 +116,13 @@ jobs:
           codesign --force --timestamp --sign "$APPLE_SIGNING_IDENTITY" "$dmg"
           xcrun notarytool submit "$dmg" --key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY" \
             --issuer "$APPLE_API_ISSUER" --wait --timeout 30m
-          xcrun stapler staple "$dmg"
+          # Notarization can be accepted while fetching the ticket from
+          # Apple's CDN still fails now and then: retry the staple.
+          for attempt in 1 2 3 4 5; do
+            xcrun stapler staple "$dmg" && break
+            [ "$attempt" = 5 ] && exit 1
+            sleep $((attempt * 15))
+          done
           spctl --assess --type execute --verbose=2 "$bundle/macos/Kimi Lite.app"
           spctl --assess --type open --context context:primary-signature --verbose=2 "$dmg"
 
