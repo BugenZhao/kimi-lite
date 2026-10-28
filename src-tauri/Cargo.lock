@@ -1998,7 +1998,7 @@ dependencies = [
 
 [[package]]
 name = "kimi-lite"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "objc2",
  "objc2-app-kit",
