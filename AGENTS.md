@@ -23,7 +23,7 @@ src-tauri/src/
   transport.rs   local login shell / OpenSSH master + forwards, askpass, probes, orphan cleanup
   scripts.rs     POSIX sh run on hosts: ensure / stop the server, GPU mask
   bridge.js      injected into Kimi pages: notifications, desktop hooks, glass, cursor, drag strip,
-                 host chip and line, reconnect banner
+                 host chip, reconnect banner
   chrome.rs      traffic-light placement (AppKit), host color dots, palette
   menu.rs        menu bar and the host switcher popup
   config.rs      hosts.json and settings

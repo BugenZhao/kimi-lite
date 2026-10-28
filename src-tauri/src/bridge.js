@@ -124,20 +124,7 @@
       if (accent) root.style.setProperty(name, accent[name]);
       else root.style.removeProperty(name);
     }
-    // A thin line in the host color along the window's top edge: visible
-    // whatever the sidebar does.
-    if (color && !line) {
-      line = document.createElement('kimi-lite-line');
-      line.style.cssText =
-        'position:fixed;top:0;left:0;right:0;height:2px;z-index:2147483645;pointer-events:none;display:block;';
-    }
-    if (line) {
-      line.style.background = color || 'transparent';
-      if (color && !line.isConnected) root.appendChild(line);
-      if (!color) line.remove();
-    }
   };
-  let line = null;
 
   let chip = null;
   let chipRoot = null;
