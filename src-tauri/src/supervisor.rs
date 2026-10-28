@@ -133,10 +133,7 @@ impl Runner {
         let mut unresponsive: u32 = 0;
         loop {
             let Some(host) = self.ctx.host() else { return };
-            let transport = match &host.ssh_host {
-                Some(ssh) => Transport::ssh(ssh, &host.id),
-                None => Transport::Local,
-            };
+            let transport = Transport::for_host(&host);
             let ever_ready = self.ctx.status.lock().unwrap().ever_ready;
             let phase = if ever_ready { Phase::Reconnecting } else { Phase::Connecting };
             self.ctx.update(|s| {

@@ -9,6 +9,9 @@
 pub const READY: &str = "__KD_READY__";
 pub const STEP: &str = "__KD_STEP__";
 pub const ERROR: &str = "__KD_ERROR__";
+pub const FETCH_BODY: &str = "__KD_BODY__";
+pub const FETCH_STATUS: &str = "__KD_HTTP__";
+pub const FETCH_EXIT: &str = "__KD_CURL__";
 
 /// Text shown by the GPU tool shims. Must stay free of `$`, backticks,
 /// single and double quotes: it is embedded in generated shell.
@@ -162,6 +165,19 @@ maskpath="${{maskdir:+$maskdir:}}$PATH""#
     )
 }
 
+/// GETs a URL with curl. `config` is a base64-encoded curl config (`-K`), so
+/// headers such as API keys stay off command lines; the body follows a marker
+/// line because login shells may print their own output first.
+pub fn fetch(config: &str) -> String {
+    format!(
+        r#"command -v curl >/dev/null 2>&1 || {{ echo "{ERROR} curl is not installed on this host."; exit 1; }}
+echo {FETCH_BODY}
+printf '%s' '{config}' | base64 -d | curl -K -
+echo "{FETCH_EXIT} $?"
+"#
+    )
+}
+
 /// Parses `__KD_READY__ <pid> <url>` into the server port and token.
 pub fn parse_ready(line: &str) -> Option<(u16, String)> {
     let rest = line.strip_prefix(READY)?.trim();
@@ -189,6 +205,7 @@ mod tests {
             ensure("kimi", false, 58627, Mode::Ensure),
             ensure("~/bin/kimi", true, 58627, Mode::Restart),
             stop(true),
+            fetch("Zm9vCg=="),
         ] {
             let status = std::process::Command::new("sh").args(["-n", "-c", &script]).status().unwrap();
             assert!(status.success(), "{script}");

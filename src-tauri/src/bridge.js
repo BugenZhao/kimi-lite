@@ -200,6 +200,11 @@
       setVibrancy(enabled) {
         invoke('kd_set_vibrancy', { enabled: !!enabled }).catch(noop);
       },
+      // "Fetch model list" for a custom provider, run with curl on the host:
+      // no CORS, and the host's own network. Kimi falls back to fetch().
+      fetchProviderModels(request) {
+        return invoke('kd_fetch_provider_models', { request }).catch(() => null);
+      },
       // Remembered app-wide, so other hosts skip the first-run screens.
       setOnboarded() {
         invoke('kd_set_onboarded').catch(noop);

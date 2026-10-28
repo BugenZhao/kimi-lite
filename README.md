@@ -10,7 +10,8 @@ Kimi Lite starts `kimi web` where you want it, keeps a private tunnel to it, and
 - **Local and SSH hosts.** It uses your own OpenSSH, so `~/.ssh/config`, `ProxyJump`, keys and agents all work. It needs one login per connection, and shows native prompts for passwords, passphrases and host keys on macOS.
 - **Survives disconnects.** Kimi keeps running on the host when the connection drops, your laptop sleeps or you close the window, so agents keep working. Kimi Lite reconnects by itself and the page picks up where it was, without a reload.
 - **Many hosts at once.** Each host has a color: a tint over its sidebar and a dot in the host switcher. Click the host chip in the sidebar header, or press ⇧⌘O, to switch hosts, or press ⌘1…⌘9.
-- **Native details.** A real menu bar, copy and paste, zoom, file drag and drop, system notifications with a Dock badge, downloads to `~/Downloads`, links opening in your browser, the arrow cursor, and windows restored on relaunch.
+- **Native details.** A real menu bar, copy and paste, zoom, file drag and drop, system notifications with a Dock badge and bounce, downloads to `~/Downloads`, links opening in your browser, the arrow cursor, and windows restored on relaunch.
+- **Custom model providers that just work.** "Fetch model list" in Kimi's provider settings runs on the host instead of in the window, so it isn't blocked by CORS, and endpoints only the host can reach (a vLLM on its localhost, a cluster-internal name) list their models too.
 - **GPU-aware.** An optional per-host setting hides local GPUs from the agent, so GPU work goes through Slurm (`srun`/`sbatch --gres=gpu:N`).
 
 ## Requirements
@@ -70,7 +71,7 @@ It relies only on Kimi Code's public CLI and web standards, plus the optional de
 ## Security
 
 - Kimi Code listens on loopback only, with its token authentication on. Tunnels bind to `127.0.0.1`.
-- Kimi's page can call only a handful of narrow app functions (notify, show window, retry, theme, glass, onboarding, host switcher). Everything else is limited to the app's own pages.
+- Kimi's page can call only a handful of narrow app functions (notify, show window, retry, theme, glass, onboarding, host switcher, listing a model provider's models). Everything else is limited to the app's own pages. The model list is fetched with an HTTP(S) GET from the host, so endpoints that only the host can reach work too.
 - The window only navigates to loopback and app pages. Other links open in your browser.
 
 ## License

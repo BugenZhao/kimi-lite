@@ -19,6 +19,7 @@ fn main() {
             "kd_notify",
             "kd_retry",
             "kd_host_menu",
+            "kd_fetch_provider_models",
         ]),
     ))
     .expect("failed to run tauri-build");

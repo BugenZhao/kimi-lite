@@ -1,5 +1,6 @@
 mod chrome;
 mod config;
+mod fetch;
 mod menu;
 mod scripts;
 mod ssh_config;
@@ -497,6 +498,18 @@ fn kd_notify(app: AppHandle, window: WebviewWindow, title: String, body: Option<
         let mut unread = state.unread.lock().unwrap();
         *unread += 1;
         let _ = window.set_badge_count(Some(*unread));
+        // One bounce, like Mail: noticeable without nagging.
+        let _ = window.request_user_attention(Some(tauri::UserAttentionType::Informational));
+    }
+}
+
+/// Lists a custom provider's models for Kimi's settings page, from the host.
+#[tauri::command]
+async fn kd_fetch_provider_models(app: AppHandle, window: WebviewWindow, request: fetch::Request) -> serde_json::Value {
+    let host = host_id(window.label()).and_then(|id| app.state::<AppState>().store.lock().unwrap().get(id).cloned());
+    match host {
+        Some(host) => fetch::run(&transport::Transport::for_host(&host), request).await,
+        None => serde_json::json!({ "ok": false, "kind": "network" }),
     }
 }
 
@@ -566,6 +579,7 @@ pub fn run() {
             kd_notify,
             kd_retry,
             kd_host_menu,
+            kd_fetch_provider_models,
         ])
         .build(tauri::generate_context!())
         .expect("error while building the app");

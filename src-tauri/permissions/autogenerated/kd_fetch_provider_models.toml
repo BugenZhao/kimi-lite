@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-kd-fetch-provider-models"
+description = "Enables the kd_fetch_provider_models command without any pre-configured scope."
+commands.allow = ["kd_fetch_provider_models"]
+
+[[permission]]
+identifier = "deny-kd-fetch-provider-models"
+description = "Denies the kd_fetch_provider_models command without any pre-configured scope."
+commands.deny = ["kd_fetch_provider_models"]

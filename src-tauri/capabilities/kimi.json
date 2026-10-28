@@ -14,6 +14,7 @@
     "allow-kd-show-window",
     "allow-kd-notify",
     "allow-kd-retry",
-    "allow-kd-host-menu"
+    "allow-kd-host-menu",
+    "allow-kd-fetch-provider-models"
   ]
 }

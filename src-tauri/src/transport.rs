@@ -138,6 +138,13 @@ impl Transport {
         Ok(ScriptResult { lines })
     }
 
+    pub fn for_host(host: &crate::config::HostConfig) -> Self {
+        match &host.ssh_host {
+            Some(ssh) => Transport::ssh(ssh, &host.id),
+            None => Transport::Local,
+        }
+    }
+
     pub fn ssh(host: &str, id: &str) -> Self {
         Transport::Ssh { host: host.to_string(), control: control_dir().join(id) }
     }
