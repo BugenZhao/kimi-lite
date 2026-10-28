@@ -1,89 +1,76 @@
 # Kimi Lite
 
-A lightweight native shell for [Kimi Code](https://github.com/MoonshotAI/kimi-code)'s web UI, on this computer or on any SSH host. It's the successor to `kimi-desktop`, rebuilt on Tauri (system WebView, no Electron).
+A lightweight native desktop app for [Kimi Code](https://github.com/MoonshotAI/kimi-code)'s web UI, on your own computer or on any machine you can reach over SSH.
 
-## What's different
+Kimi Lite starts `kimi web` where you want it, keeps a private tunnel to it, and shows its UI in a native window that looks like it belongs there. It is about 6 MB (it uses the system WebView) and is built with [Tauri](https://tauri.app).
 
-- **Seamless instead of wrapped.** Each host is its own native window, and the Kimi UI fills the whole window. Kimi's opt-in desktop presentation (`?kimi_desktop=1`) puts its header in the title bar, with the traffic lights lined up on its row. There is no shell sidebar and no second visual style.
-- **Many hosts at once.** Every host has a color: a subtle tint over its glass sidebar, a dot in the menus, and a small host chip in the empty part of Kimi's sidebar header. Clicking the chip (or ⇧⌘O anywhere) opens a native host switcher; ⌘1…⌘9 jump straight to a host, and ⌘` cycles windows as usual. One window per host keeps Mission Control, Stage Manager, split view and multiple displays working. Native window tabs are not offered: AppKit draws no tab bar under a seamless title bar.
-- **Reconnects for real.** Servers run detached on the host (`nohup`/`setsid`), so a dropped connection, a sleeping laptop or a closed window doesn't stop running agents. Each host keeps a **stable local port**, so after a reconnect the page keeps its origin, storage and state. The app tells the page with a standard `online` event, and the page reopens its own socket without a reload.
-- **Fast failure detection.** The app owns an SSH master connection (`ssh -M`). If it exits, the app knows immediately. A `GET /` health probe every 5s (plus wake-from-sleep detection) catches everything else. Backoff is 1, 2, 3, 5, 10, 20, then 30s, forever, with *Retry now* in a small banner.
-- **One SSH login per connect.** Scripts and port forwards share the master. On macOS, password, passphrase and host-key prompts appear as native dialogs (`SSH_ASKPASS`).
-- **Native bits.** Real menu bar, Edit menu (copy/paste), zoom, file drops into the page, native notifications (with a Dock badge while the app is in the background), downloads to `~/Downloads`, external links in the default browser, and windows restored on relaunch.
-- **Glass and native styling.** On macOS the sidebar sits on the system's frosted-glass material, as in the official app. The Hosts window, connection screen and reconnect banner use Kimi's own font (Schibsted Grotesk), grays, buttons and switches, so they read as part of Kimi. Controls use the arrow cursor like a native app (links in message text keep the hand): Kimi's own `cursor: pointer` rules are rewritten once as its stylesheets load.
-- **Onboarding once.** Each host is its own origin, so Kimi would show its welcome screens for every new host. After you finish them once, every host is told so.
-- **Small.** The release bundle is about 6 MB (it uses the system WebView instead of bundling Chromium).
+## Features
 
-## Coupling to Kimi Code (kept deliberately thin)
+- **Seamless windows.** Each host gets its own window, and Kimi's UI fills it completely, with its header in the title bar and a frosted-glass sidebar on macOS. No extra chrome.
+- **Local and SSH hosts.** It uses your own OpenSSH, so `~/.ssh/config`, `ProxyJump`, keys and agents all work. It needs one login per connection, and shows native prompts for passwords, passphrases and host keys on macOS.
+- **Survives disconnects.** Kimi keeps running on the host when the connection drops, your laptop sleeps or you close the window, so agents keep working. Kimi Lite reconnects by itself and the page picks up where it was, without a reload.
+- **Many hosts at once.** Each host has a color: a tint over its sidebar and a dot in the host switcher. Click the host chip in the sidebar header, or press ⇧⌘O, to switch hosts, or press ⌘1…⌘9.
+- **Native details.** A real menu bar, copy and paste, zoom, file drag and drop, system notifications with a Dock badge, downloads to `~/Downloads`, links opening in your browser, the arrow cursor, and windows restored on relaunch.
+- **GPU-aware.** An optional per-host setting hides local GPUs from the agent, so GPU work goes through Slurm (`srun`/`sbatch --gres=gpu:N`).
 
-Kimi Code moves fast, so the app relies on as little of it as possible.
+## Requirements
 
-| Relied on | Kind |
-| --- | --- |
-| `kimi web --no-open --port N` prints `http://127.0.0.1:N/#token=…` | CLI contract |
-| `GET /` returns 2xx | HTTP |
-| `new Notification(...)`, the `online` event | Web standards |
-| `?kimi_desktop=1&platform=…&kimi_vibrancy=1&kimi_onboarded=1`, optional `window.kimiDesktop` hooks (`onMenuAction`, `showWindow`, `setTheme`, `get/setVibrancy`, `setOnboarded`) | Opt-in, degrades to plain web mode |
-| Frosted sidebar shim: `--color-sidebar-bg` and the page/`#app`/`.app` backgrounds go transparent | Cosmetic; falls back to an opaque sidebar if the markup changes |
-| Arrow cursor: rewrites `cursor: pointer` in Kimi's same-origin stylesheets | Cosmetic; no class names involved |
+- macOS 12 or later. The code builds for Linux and Windows too, but they are untested so far.
+- [Kimi Code](https://github.com/MoonshotAI/kimi-code) installed and signed in on every host you use, including your own computer if you use it locally. Kimi Lite finds `kimi` on `PATH` or in `~/.kimi-code/bin`.
+- For SSH hosts: OpenSSH, with key or agent authentication (password prompts work too), and a POSIX `sh` on the host.
 
-The app does **not** read `~/.kimi-code` internals (server registry, tokens), call private API routes, or reach into the page's framework state. Servers are tracked with a pidfile and log the app owns, under `${XDG_STATE_HOME:-~/.local/state}/kimi-lite/` on each host.
+## Install
 
-If a Kimi update ever breaks the desktop presentation, turn off **Settings → Seamless title bar** (or just **Frosted sidebar**). The app then shows the plain web UI under a standard title bar.
-
-## How a connection works
-
-```text
-Host window ──► 127.0.0.1:<stable port> ──► ssh -M master ──► 127.0.0.1:<server port> on host
-                                              │
-                                              └─ sh: ensure server (reuse pidfile, else nohup kimi web)
-```
-
-1. Open the SSH master (skipped for this computer).
-2. Run the ensure script under the host's login shell: reuse the tracked server if it's alive (pid plus start time), otherwise start a new one on a free port.
-3. Forward the stable local port to it (`ssh -O forward`).
-4. Probe `GET /`, then show the page, or keep the current page if the origin is unchanged.
-
-**Hide GPUs** starts a separate server variant with empty `CUDA/NVIDIA/HIP/ROCR_VISIBLE_DEVICES`, and shims `nvidia-smi`/`rocm-smi` so agents go through Slurm.
-
-## Development
-
-You need Rust (stable), Node.js 22+ and pnpm.
+There are no prebuilt releases yet. To build from source you need Rust (stable), Node.js 22+ and pnpm:
 
 ```sh
+git clone https://github.com/BugenZhao/kimi-lite.git
+cd kimi-lite
 pnpm install
-pnpm dev          # run in development
-pnpm build        # release bundle (.app / .dmg)
-cd src-tauri && cargo test
-# SSH lifecycle against a real host (opt-in):
-KL_TEST_HOST=<ssh host> cargo test --lib live_ -- --ignored --nocapture
-# Leak snapshot (local ssh processes, sockets, forwards; remote servers, sessions):
-scripts/leakcheck.sh <ssh host>
+pnpm build
 ```
 
-Fault drills run against a GB200 host: SSH master killed, hung (SIGSTOP), remote server SIGKILL and SIGTERM, a 25s app freeze with the connection lost meanwhile, soaks of 7 and 13 faults in a row, Stop/Start, closing and reopening the host window, Quit and relaunch, and `kill -9` of the app itself. Every fault recovered on the same local port (2–14s) and reused the running server where one existed; after Quit or a crash no ssh process, socket, forward or remote session is left behind, and nothing grows across faults.
+The app is written to `src-tauri/target/release/bundle/macos/Kimi Lite.app`.
 
-Layout:
+## Usage
 
-```text
-src-tauri/src/
-  lib.rs         windows, IPC commands, navigation/download/notification policy
-  supervisor.rs  per-host state machine: connect → serve → health → reconnect
-  transport.rs   local shell / OpenSSH master, forwards, askpass, probe
-  scripts.rs     POSIX sh run on hosts (ensure / stop server, GPU mask)
-  bridge.js      injected into Kimi pages: notifications, drag strip, banner, hooks
-  menu.rs        native menu bar
-  config.rs      hosts.json
-ui/              Hosts window and connection screen (plain HTML)
-```
+The **Hosts** window (⇧⌘H) lists your hosts. **This Mac** is always there. **Add SSH Host** takes an alias from `~/.ssh/config` (suggestions are offered) or `user@host`. Opening a host starts Kimi Code there if it isn't running, or reuses it if it is.
+
+| Shortcut | Action |
+| --- | --- |
+| ⇧⌘O | Switch host |
+| ⌘1 … ⌘9 | Go to a host |
+| ⇧⌘H | Hosts window |
+| ⌥⌘R | Reconnect |
+| ⌘R | Reload page |
+| ⌘= / ⌘- / ⌘0 | Zoom |
+
+Kimi Code keeps running on a host after its window closes. To shut it down, use **Host → Stop Kimi Code on Host**, or **Stop Kimi Code** in the Hosts window.
+
+**Settings:**
+- **Seamless title bar** turns off Kimi's desktop layout and shows the plain web UI under a standard title bar.
+- **Frosted sidebar** turns off the glass effect.
+
+## Troubleshooting
+
+- **Stuck on "Waiting for SSH authentication…".** Your SSH agent is probably waiting for approval (for example, 1Password asks the first time an app uses a key). Approve it, or test with `ssh <host>` in a terminal.
+- **Kimi Code fails to start on a host.** Open **Show details** on the connection screen. The server's own log is at `~/.local/state/kimi-lite/server.log` on the host.
+- **Something looks off after a Kimi Code update.** Turn off **Seamless title bar** in Settings; Kimi Lite then shows the plain web UI.
+
+## How it works
+
+Kimi Lite runs `kimi web --no-open` on the host, detached so it outlives the connection, and tracks it with its own pidfile. It forwards a local port that stays the same for each host, so the page keeps its storage across reconnects, through one SSH connection it owns. It watches that connection and a plain `GET /` health check, and reconnects with backoff when either fails.
+
+It relies only on Kimi Code's public CLI and web standards, plus the optional desktop hooks Kimi's web UI exposes. It never reads Kimi's internal files or private APIs.
 
 ## Security
 
-- Kimi listens on loopback only, and its bearer token stays on. Tunnels bind to `127.0.0.1`.
-- Kimi pages can call exactly four app commands (notify, show window, retry, set theme) plus window dragging. Everything else is limited to the app's own pages (`capabilities/`).
-- Navigation is restricted to loopback and app pages. Other links open in the default browser.
-- SSH hosts and commands are validated and passed as arguments, never through a local shell.
+- Kimi Code listens on loopback only, with its token authentication on. Tunnels bind to `127.0.0.1`.
+- Kimi's page can call only a handful of narrow app functions (notify, show window, retry, theme, glass, onboarding, host switcher). Everything else is limited to the app's own pages.
+- The window only navigates to loopback and app pages. Other links open in your browser.
 
-## License and branding
+## License
 
-MIT. “Kimi” and related marks belong to their respective owners. The bundled Schibsted Grotesk font is licensed under the SIL Open Font License 1.1. The app icon is taken from the official Kimi Code desktop app, for personal use only; replace it before distributing builds.
+MIT, see [LICENSE](LICENSE).
+
+Kimi Lite is an independent project, not affiliated with or endorsed by Moonshot AI. “Kimi” and “Kimi Code” are trademarks of their respective owners. The bundled Schibsted Grotesk font is licensed under the [SIL Open Font License 1.1](ui/fonts/OFL.txt).

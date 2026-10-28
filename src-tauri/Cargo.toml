@@ -2,6 +2,9 @@
 name = "kimi-lite"
 version = "0.1.0"
 edition = "2021"
+description = "Lightweight native desktop app for Kimi Code's web UI, local or over SSH"
+license = "MIT"
+repository = "https://github.com/BugenZhao/kimi-lite"
 
 [lib]
 name = "kimi_lite_lib"

@@ -2,6 +2,9 @@
   "name": "kimi-lite",
   "private": true,
   "version": "0.1.0",
+  "description": "Lightweight native desktop app for Kimi Code's web UI, local or over SSH",
+  "license": "MIT",
+  "repository": "github:BugenZhao/kimi-lite",
   "scripts": {
     "dev": "tauri dev",
     "build": "tauri build",
