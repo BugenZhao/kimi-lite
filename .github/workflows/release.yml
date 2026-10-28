@@ -135,10 +135,14 @@ jobs:
           cp "$bundle"/dmg/*.dmg "dist/Kimi-Lite_${VERSION}_aarch64.dmg"
           ditto -c -k --keepParent "$bundle/macos/Kimi Lite.app" "dist/Kimi-Lite_${VERSION}_aarch64.app.zip"
 
-          # Release notes: the commits since the previous tag that change the
-          # app itself (not only CI or docs).
+          # Release notes: the body of the "Release x.y.z" commit when it has
+          # one, else the commits since the previous tag that change the app
+          # itself (not only CI or docs).
+          if git log -1 --format=%s | grep -q '^Release '; then
+            git log -1 --format=%b | grep -v -e '^Co-Authored-By:' -e '^[[:space:]]*$' > notes.md || true
+          fi
           previous="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)"
-          if [ -n "$previous" ]; then
+          if [ ! -s notes.md ] && [ -n "$previous" ]; then
             git log --no-merges --format='- %s' "$previous..HEAD" -- src-tauri ui \
               | grep -v '^- Release ' > notes.md || true
           fi
