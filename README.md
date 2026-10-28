@@ -56,6 +56,10 @@ Kimi Code keeps running on a host after its window closes. To shut it down, use 
 - **Seamless title bar** turns off Kimi's desktop layout and shows the plain web UI under a standard title bar.
 - **Frosted sidebar** turns off the glass effect.
 
+## Links to sessions
+
+**Edit → Copy Session Link** (⇧⌘C) copies a link to the session in front, like `kimi://sessions/session_2e802548-…`. Opening it (from a note, an issue, Raycast) brings up that session in the window of whichever host has it. Links don't name the host: session IDs are unique, so Kimi Lite finds the host itself, first among sessions it has seen, then by asking your hosts with `kimi session list`. A link works on any Mac where the same hosts are set up, whatever they are called there.
+
 ## Troubleshooting
 
 - **Stuck on "Waiting for SSH authentication…".** Your SSH agent is probably waiting for approval (for example, 1Password asks the first time an app uses a key). Approve it, or test with `ssh <host>` in a terminal.

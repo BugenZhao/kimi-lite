@@ -1,6 +1,7 @@
 mod chrome;
 mod config;
 mod fetch;
+mod links;
 mod menu;
 mod scripts;
 mod ssh_config;
@@ -28,6 +29,8 @@ pub struct AppState {
     sessions: Mutex<HashMap<String, Supervisor>>,
     zoom: Mutex<HashMap<String, f64>>,
     unread: Mutex<i64>,
+    /// A page to show once a host's window connects (from a `kimi://` link).
+    pending_paths: Mutex<HashMap<String, String>>,
 }
 
 pub fn host_label(id: &str) -> String {
@@ -548,6 +551,7 @@ pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_deep_link::init())
         .setup(|app| {
             let config_dir = app.path().app_config_dir()?;
             transport::install_askpass(&app.path().app_data_dir()?);
@@ -557,10 +561,20 @@ pub fn run() {
                 sessions: Mutex::new(HashMap::new()),
                 zoom: Mutex::new(HashMap::new()),
                 unread: Mutex::new(0),
+                pending_paths: Mutex::new(HashMap::new()),
             });
             let handle = app.handle().clone();
             menu::install(&handle)?;
             updates::spawn_background(handle.clone());
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                let links = handle.clone();
+                app.deep_link().on_open_url(move |event| {
+                    for url in event.urls() {
+                        links::handle(&links, url.as_str());
+                    }
+                });
+            }
 
             // Restore the host windows that were open at quit.
             let reopen = app.state::<AppState>().store.lock().unwrap().open_hosts.clone();

@@ -2,7 +2,7 @@
 //! colored dots that identify hosts in menus.
 
 use tauri::image::Image;
-use tauri::WebviewWindow;
+use tauri::{AppHandle, WebviewWindow};
 
 /// Left inset of the close button, and the vertical center the buttons line
 /// up with: the middle of Kimi's 48px header row.
@@ -75,6 +75,62 @@ unsafe fn place_traffic_lights(window: &objc2_app_kit::NSWindow) {
         origin.y = (parent_height - close_frame.size.height) / 2.0;
         button.setFrameOrigin(origin);
     }
+}
+
+/// A native app-modal alert; answers the index of the button pressed.
+pub async fn alert(app: &AppHandle, title: &str, text: &str, buttons: &[&str]) -> Option<usize> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let (title, text) = (title.to_string(), text.to_string());
+    let buttons: Vec<String> = buttons.iter().map(|b| b.to_string()).collect();
+    app.run_on_main_thread(move || {
+        let _ = tx.send(show_alert(&title, &text, &buttons));
+    })
+    .ok()?;
+    rx.await.ok().flatten()
+}
+
+#[cfg(target_os = "macos")]
+fn show_alert(title: &str, text: &str, buttons: &[String]) -> Option<usize> {
+    use objc2::MainThreadMarker;
+    use objc2_app_kit::{NSAlert, NSAlertFirstButtonReturn, NSApplication};
+    use objc2_foundation::NSString;
+
+    let mtm = MainThreadMarker::new()?;
+    let alert = NSAlert::new(mtm);
+    alert.setMessageText(&NSString::from_str(title));
+    alert.setInformativeText(&NSString::from_str(text));
+    for button in buttons {
+        alert.addButtonWithTitle(&NSString::from_str(button));
+    }
+    #[allow(deprecated)]
+    NSApplication::sharedApplication(mtm).activateIgnoringOtherApps(true);
+    usize::try_from(alert.runModal() - NSAlertFirstButtonReturn).ok()
+}
+
+#[cfg(not(target_os = "macos"))]
+fn show_alert(_title: &str, _text: &str, _buttons: &[String]) -> Option<usize> {
+    None
+}
+
+/// Puts plain text on the general pasteboard.
+pub fn copy_text(text: &str) {
+    #[cfg(target_os = "macos")]
+    {
+        use objc2_app_kit::{NSPasteboard, NSPasteboardTypeString};
+        use objc2_foundation::NSString;
+        let pasteboard = NSPasteboard::generalPasteboard();
+        pasteboard.clearContents();
+        // SAFETY: a system constant.
+        pasteboard.setString_forType(&NSString::from_str(text), unsafe { NSPasteboardTypeString });
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = text;
+}
+
+/// The system alert sound, for a command that has nothing to act on.
+pub fn beep() {
+    #[cfg(target_os = "macos")]
+    objc2_app_kit::NSBeep();
 }
 
 /// Palette for host identity, in Kimi's register (its accent blue first).

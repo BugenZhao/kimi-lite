@@ -75,7 +75,9 @@ impl Transport {
                 cmd
             }
             Transport::Ssh { host, control } => {
-                let mut cmd = ssh_command(control);
+                // Without a master (a host whose window is closed, asked
+                // about a session link), connect on our own.
+                let mut cmd = if control.exists() { ssh_command(control) } else { base_ssh_command() };
                 // Parsed by the remote login shell, whichever it is (fish too).
                 cmd.args(["-T", host, r#"sh -c 'exec "${SHELL:-/bin/sh}" -l -c "exec sh -s"'"#]);
                 cmd

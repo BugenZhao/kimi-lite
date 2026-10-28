@@ -49,7 +49,7 @@ async fn check(app: &AppHandle, interactive: bool) {
         eprintln!("update check failed: {error}");
         if interactive {
             let text = format!("Kimi Lite couldn't check for updates. Try again later.\n\n{error}");
-            alert(app, "Update Error", &text, &["OK"]).await;
+            crate::chrome::alert(app, "Update Error", &text, &["OK"]).await;
         }
     }
 }
@@ -61,7 +61,7 @@ async fn run(app: &AppHandle, interactive: bool) -> Result<(), String> {
         if interactive {
             let version = app.package_info().version.to_string();
             let text = format!("{name} {version} is currently the newest version available.");
-            alert(app, "You're up to date!", &text, &["OK"]).await;
+            crate::chrome::alert(app, "You're up to date!", &text, &["OK"]).await;
         }
         return Ok(());
     };
@@ -85,7 +85,7 @@ async fn run(app: &AppHandle, interactive: bool) -> Result<(), String> {
         text.push_str(&truncate(notes, NOTES_LIMIT));
     }
     let title = format!("A new version of {name} is available!");
-    match alert(app, &title, &text, &["Install and Relaunch", "Later", "Skip This Version"]).await {
+    match crate::chrome::alert(app, &title, &text, &["Install and Relaunch", "Later", "Skip This Version"]).await {
         Some(0) => {
             update.install(bytes).map_err(|e| e.to_string())?;
             app.restart();
@@ -106,41 +106,6 @@ fn truncate(text: &str, limit: usize) -> String {
         Some((cut, _)) => format!("{}…", text[..cut].trim_end()),
         None => text.to_string(),
     }
-}
-
-/// A native app-modal alert; answers the index of the button pressed.
-async fn alert(app: &AppHandle, title: &str, text: &str, buttons: &[&str]) -> Option<usize> {
-    let (tx, rx) = tokio::sync::oneshot::channel();
-    let (title, text) = (title.to_string(), text.to_string());
-    let buttons: Vec<String> = buttons.iter().map(|b| b.to_string()).collect();
-    app.run_on_main_thread(move || {
-        let _ = tx.send(show_alert(&title, &text, &buttons));
-    })
-    .ok()?;
-    rx.await.ok().flatten()
-}
-
-#[cfg(target_os = "macos")]
-fn show_alert(title: &str, text: &str, buttons: &[String]) -> Option<usize> {
-    use objc2::MainThreadMarker;
-    use objc2_app_kit::{NSAlert, NSAlertFirstButtonReturn, NSApplication};
-    use objc2_foundation::NSString;
-
-    let mtm = MainThreadMarker::new()?;
-    let alert = NSAlert::new(mtm);
-    alert.setMessageText(&NSString::from_str(title));
-    alert.setInformativeText(&NSString::from_str(text));
-    for button in buttons {
-        alert.addButtonWithTitle(&NSString::from_str(button));
-    }
-    #[allow(deprecated)]
-    NSApplication::sharedApplication(mtm).activateIgnoringOtherApps(true);
-    usize::try_from(alert.runModal() - NSAlertFirstButtonReturn).ok()
-}
-
-#[cfg(not(target_os = "macos"))]
-fn show_alert(_title: &str, _text: &str, _buttons: &[String]) -> Option<usize> {
-    None
 }
 
 #[cfg(test)]

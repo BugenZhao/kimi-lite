@@ -38,6 +38,13 @@
       "endpoints": [
         "https://github.com/BugenZhao/kimi-lite/releases/latest/download/latest.json"
       ]
+    },
+    "deep-link": {
+      "desktop": {
+        "schemes": [
+          "kimi"
+        ]
+      }
     }
   }
 }

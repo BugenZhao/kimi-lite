@@ -9,6 +9,7 @@
 pub const READY: &str = "__KD_READY__";
 pub const STEP: &str = "__KD_STEP__";
 pub const ERROR: &str = "__KD_ERROR__";
+pub const FOUND: &str = "__KD_FOUND__";
 pub const FETCH_BODY: &str = "__KD_BODY__";
 pub const FETCH_STATUS: &str = "__KD_HTTP__";
 pub const FETCH_EXIT: &str = "__KD_CURL__";
@@ -72,7 +73,8 @@ stop_server() {{
     )
 }
 
-pub fn ensure(command: &str, hide_gpus: bool, preferred_port: u16, mode: Mode) -> String {
+/// Sets `bin` to the Kimi Code executable, or leaves it empty.
+fn find_kimi(command: &str) -> (String, String) {
     let command = command.strip_prefix("~/").map(|rest| format!("$HOME/{rest}")).unwrap_or_else(|| command.to_string());
     let lookup = if command.contains('/') {
         format!(r#"bin="{command}""#)
@@ -86,6 +88,27 @@ for c in "${{KIMI_CODE_HOME:-$HOME/.kimi-code}}/bin/{command}" "$HOME/.local/bin
 done"#
         )
     };
+    (command, lookup)
+}
+
+/// Whether this host has the session, asked through Kimi's own CLI. Only a
+/// yes or no leaves the host. `session` must be plain characters.
+pub fn has_session(command: &str, session: &str) -> String {
+    let (command, lookup) = find_kimi(command);
+    format!(
+        r#"{lookup}
+if [ -z "$bin" ] || [ ! -x "$bin" ]; then echo "{ERROR} Could not find '{command}' on this host."; exit 127; fi
+if "$bin" session list --all --archived --json 2>/dev/null | grep -Eq '"id": *"{session}"'; then
+  echo "{FOUND} yes"
+else
+  echo "{FOUND} no"
+fi
+"#
+    )
+}
+
+pub fn ensure(command: &str, hide_gpus: bool, preferred_port: u16, mode: Mode) -> String {
+    let (command, lookup) = find_kimi(command);
     let (gpu_setup, env_prefix) = if hide_gpus { (gpu_mask_setup(), GPU_ENV_PREFIX) } else { (String::new(), "") };
     let restart = if mode == Mode::Restart { "stop_server" } else { "" };
     format!(
@@ -206,6 +229,7 @@ mod tests {
             ensure("~/bin/kimi", true, 58627, Mode::Restart),
             stop(true),
             fetch("Zm9vCg=="),
+            has_session("kimi", "session_2e802548-0f7b-4fc1-aafc-9cdcf9a8d768"),
         ] {
             let status = std::process::Command::new("sh").args(["-n", "-c", &script]).status().unwrap();
             assert!(status.success(), "{script}");

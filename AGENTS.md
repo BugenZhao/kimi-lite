@@ -29,6 +29,7 @@ src-tauri/src/
   config.rs      hosts.json and settings
   fetch.rs       provider model lists fetched on the host (`fetchProviderModels`)
   updates.rs     self-updates from GitHub Releases: background checks, Check for Updates…, alert
+  links.rs       kimi:// links: find the session's host (index, then `kimi session list`), open it
   ssh_config.rs  Host aliases from ~/.ssh/config (follows Include)
 src-tauri/capabilities/
   app.json       what the app's own pages may call
@@ -44,7 +45,9 @@ scripts/         leakcheck.sh
 | Contract | Notes |
 | --- | --- |
 | `kimi web --no-open --port N` prints `http://127.0.0.1:N/#token=…` | The only CLI contract |
+| `kimi session list --all --archived --json` lists sessions with an `"id"` | Finding which host has a linked session; only a yes/no leaves the host |
 | `GET /` answers 2xx | Health probe |
+| The page shows a session at `/sessions/<session-id>` | `kimi://sessions/<id>` links open there; Copy Session Link reads it from the window URL |
 | Web standards: `Notification`, the `online` event | Polyfilled or dispatched by the bridge |
 | `?kimi_desktop=1&platform=…&kimi_vibrancy=1&kimi_onboarded=1` and `window.kimiDesktop` hooks (`onMenuAction`, `showWindow`, `setTheme`, `getVibrancy`/`setVibrancy`, `setOnboarded`, `onUpdateStatus`/`getUpdateStatus`, `fetchProviderModels`) | Kimi's own opt-in desktop presentation. Once `kimiDesktop` exists, the page calls `onUpdateStatus`/`getUpdateStatus` unconditionally, so they must exist. The page served by `kimi web` 2.3 no longer reads `kimi_vibrancy` or calls the vibrancy hooks (the official app's own UI build still does); the frosted-sidebar shim covers it. |
 | `fetchProviderModels({url, headers, timeoutMs})` → `{ok, status, body}` or `{ok: false, kind}` | "Fetch model list" for a custom provider. `fetch.rs` runs it with `curl` on the host (http(s) GET only, config passed base64-encoded so keys stay off command lines): no CORS, and the host's own network. Without the hook the page falls back to `fetch()`. |

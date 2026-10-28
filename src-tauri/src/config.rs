@@ -109,9 +109,21 @@ pub struct Store {
     /// Host windows open at quit, reopened on launch.
     #[serde(default)]
     pub open_hosts: Vec<String>,
+    /// Which host each recently linked session lives on (most recent first),
+    /// so `kimi://` links to them open without asking the hosts.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sessions: Vec<SessionHost>,
     #[serde(skip)]
     path: PathBuf,
 }
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SessionHost {
+    pub session: String,
+    pub host: String,
+}
+
+const SESSION_INDEX_LIMIT: usize = 500;
 
 impl Store {
     pub fn load(dir: &Path) -> Self {
@@ -136,6 +148,20 @@ impl Store {
             );
         }
         store
+    }
+
+    pub fn session_host(&self, session: &str) -> Option<&str> {
+        self.sessions.iter().find(|s| s.session == session).map(|s| s.host.as_str())
+    }
+
+    pub fn remember_session(&mut self, session: &str, host: &str) {
+        if self.sessions.first().is_some_and(|s| s.session == session && s.host == host) {
+            return;
+        }
+        self.sessions.retain(|s| s.session != session);
+        self.sessions.insert(0, SessionHost { session: session.to_string(), host: host.to_string() });
+        self.sessions.truncate(SESSION_INDEX_LIMIT);
+        self.save();
     }
 
     pub fn save(&self) {

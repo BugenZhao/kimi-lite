@@ -92,6 +92,8 @@ fn build(app: &AppHandle) -> tauri::Result<(Menu<Wry>, Submenu<Wry>)> {
             &PredefinedMenuItem::copy(app, None)?,
             &PredefinedMenuItem::paste(app, None)?,
             &PredefinedMenuItem::select_all(app, None)?,
+            &sep()?,
+            &item(app, "copy-session-link", "Copy Session Link", Some("CmdOrCtrl+Shift+C"))?,
         ],
     )?;
 
@@ -185,6 +187,7 @@ fn handle(app: &AppHandle, id: &str) {
     match id {
         "hosts" => crate::show_hosts_window(app, None),
         "check-updates" => crate::updates::check_now(app),
+        "copy-session-link" => crate::links::copy_session_link(app),
         "new-host" => crate::show_hosts_window(app, Some("new")),
         "switch-host" => match crate::focused_window(app) {
             // Under the host chip in Kimi's sidebar header.

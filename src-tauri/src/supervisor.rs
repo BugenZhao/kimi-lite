@@ -242,7 +242,12 @@ impl Runner {
     /// Shows the host and watches it until something goes wrong.
     async fn serve(&mut self, mut connection: Connection) -> Exit {
         let settings = self.ctx.app.state::<AppState>().store.lock().unwrap().settings.clone();
-        let url = kimi_url(connection.port, &connection.token, &settings);
+        let mut url = kimi_url(connection.port, &connection.token, &settings);
+        // A `kimi://` link asked for a page on this host (a session).
+        let target = self.ctx.app.state::<AppState>().pending_paths.lock().unwrap().remove(&self.ctx.id);
+        if let Some(path) = &target {
+            url.set_path(path);
+        }
         self.ctx.log(&format!("Serving on 127.0.0.1:{}", connection.port));
         self.ctx.update(|s| {
             s.phase = Phase::Ready;
@@ -251,7 +256,7 @@ impl Runner {
             s.retry_in = None;
             s.ever_ready = true;
         });
-        self.ctx.show(&url);
+        self.ctx.show(&url, target.is_some());
 
         let mut ticker = tokio::time::interval(HEALTH_INTERVAL);
         ticker.tick().await;
@@ -419,10 +424,12 @@ impl Ctx {
 
     /// Navigates to the server unless the window already shows it, in which
     /// case the page stays put and reconnects its own socket.
-    fn show(&self, url: &Url) {
+    /// Shows Kimi's page. One that is already up just reconnects (it keeps
+    /// its state) unless `navigate` asks for `url` itself.
+    fn show(&self, url: &Url, navigate: bool) {
         let Some(window) = self.window() else { return };
         let same_origin = window.url().map(|current| current.origin() == url.origin()).unwrap_or(false);
-        if same_origin {
+        if same_origin && !navigate {
             let _ = window.eval("window.__kd ? window.__kd.reconnected() : location.reload()");
         } else {
             replace_location(&window, url);
