@@ -110,7 +110,7 @@ Not allowed: reading `~/.kimi-code` internals (server registry, tokens, session 
 git tag v0.1.0 && git push origin v0.1.0
 ```
 
-The workflow refuses a tag that doesn't match the app version, and drafts a GitHub release with the `.dmg`, a zipped `.app` and `SHA256SUMS`. Review and publish the draft by hand. Running the workflow manually (Actions → Release → Run workflow) builds the same files as a workflow artifact without a release.
+The workflow refuses a tag that doesn't match the app version, and publishes a GitHub release with the `.dmg`, a zipped `.app` and `SHA256SUMS`. The short commit hash is the bundle's build number (About shows `0.1.0 (abc1234)`) and is part of the release title and file names. Running the workflow manually (Actions → Release → Run workflow) builds the same files as a workflow artifact without a release.
 
 ## Icons
 
