@@ -42,7 +42,7 @@
     "deep-link": {
       "desktop": {
         "schemes": [
-          "kimi"
+          "kimi-lite"
         ]
       }
     }

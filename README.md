@@ -58,7 +58,9 @@ Kimi Code keeps running on a host after its window closes. To shut it down, use 
 
 ## Links to sessions
 
-**Edit → Copy Session Link** (⇧⌘C) copies a link to the session in front, like `kimi://sessions/session_2e802548-…`. Opening it (from a note, an issue, Raycast) brings up that session in the window of whichever host has it. Links don't name the host: session IDs are unique, so Kimi Lite finds the host itself, first among sessions it has seen, then by asking your hosts with `kimi session list`. A link works on any Mac where the same hosts are set up, whatever they are called there.
+**Edit → Copy Session Link** (⇧⌘C) copies a link to the session in front, like `kimi-lite://sessions/session_2e802548-…?host=gb200.example.com`. Opening it (from a note, an issue, Raycast) brings up that session in the window of whichever host has it.
+
+Session IDs are unique, so the host part is only a hint: Kimi Lite looks among sessions it has seen, then on the hinted host (matched against each host's SSH host, name or id), then asks all your hosts with `kimi session list`. A link works on any Mac where the same hosts are set up, whatever they are called there; `kimi-lite://sessions/<id>` without a hint works too.
 
 ## Troubleshooting
 
