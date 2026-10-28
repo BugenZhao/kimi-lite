@@ -136,10 +136,10 @@ jobs:
           ditto -c -k --keepParent "$bundle/macos/Kimi Lite.app" "dist/Kimi-Lite_${VERSION}_aarch64.app.zip"
 
           # Release notes: the commits since the previous tag that change the
-          # app (not only CI).
+          # app itself (not only CI or docs).
           previous="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)"
           if [ -n "$previous" ]; then
-            git log --no-merges --format='- %s' "$previous..HEAD" -- . ':(exclude).github' \
+            git log --no-merges --format='- %s' "$previous..HEAD" -- src-tauri ui \
               | grep -v '^- Release ' > notes.md || true
           fi
           [ -s notes.md ] || echo "- First release." > notes.md

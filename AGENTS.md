@@ -123,7 +123,7 @@ Without them (forks), the build falls back to an ad-hoc signature and skips nota
 git tag v0.1.0 && git push origin v0.1.0
 ```
 
-The workflow refuses a tag that doesn't match the app version, and publishes a GitHub release with the `.dmg`, a zipped `.app`, the update archive (`.app.tar.gz` and its `.sig`), `latest.json` and `SHA256SUMS`. The release notes, shown in the app's update alert too, are the commit subjects since the previous tag (minus "Release …" commits and commits that only touch `.github/`), so write subjects for users. The short commit hash is the bundle's build number (About shows `0.1.0 (abc1234)`) and is part of the release title and file names. Running the workflow manually (Actions → Release → Run workflow) builds the same files as a workflow artifact without a release.
+The workflow refuses a tag that doesn't match the app version, and publishes a GitHub release with the `.dmg`, a zipped `.app`, the update archive (`.app.tar.gz` and its `.sig`), `latest.json` and `SHA256SUMS`. The release notes, shown in the app's update alert too, are the commit subjects since the previous tag that touch the app itself (`src-tauri/`, `ui/`), minus "Release …" commits, so write subjects for users. The short commit hash is the bundle's build number (About shows `0.1.0 (abc1234)`) and is part of the release title and file names. Running the workflow manually (Actions → Release → Run workflow) builds the same files as a workflow artifact without a release.
 
 ### Updates
 
