@@ -104,7 +104,15 @@ Not allowed: reading `~/.kimi-code` internals (server registry, tokens, session 
 
 ## Releases
 
-`.github/workflows/release.yml` builds on an Apple Silicon runner (`macos-15`): tests, then the `.app` and `.dmg`, ad-hoc signed (`APPLE_SIGNING_IDENTITY=-`; there is no Developer ID or notarization yet). To release, bump `version` in `src-tauri/tauri.conf.json` (and `Cargo.toml`, `package.json`), commit, then push a matching tag:
+`.github/workflows/release.yml` builds on an Apple Silicon runner (`macos-15`): tests, then the `.app` and `.dmg`, signed with a Developer ID (hardened runtime), notarized and stapled. Tauri notarizes the app; the workflow then signs, notarizes and staples the disk image and checks both with `spctl`. Repository secrets:
+
+| Secret | What |
+| --- | --- |
+| `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD` | Base64 `.p12` with the Developer ID Application certificate and its key, and its password |
+| `APPLE_SIGNING_IDENTITY` | `Developer ID Application: <name> (<team>)` |
+| `APPLE_API_KEY`, `APPLE_API_ISSUER`, `APPLE_API_KEY_P8` | App Store Connect API key (Developer role) for `notarytool`: key ID, issuer ID, `.p8` contents |
+
+Without them (forks), the build falls back to an ad-hoc signature and skips notarization. To release, bump `version` in `src-tauri/tauri.conf.json` (and `Cargo.toml`, `package.json`), commit, then push a matching tag:
 
 ```sh
 git tag v0.1.0 && git push origin v0.1.0

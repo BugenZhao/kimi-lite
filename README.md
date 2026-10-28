@@ -21,13 +21,7 @@ Kimi Lite starts `kimi web` where you want it, keeps a private tunnel to it, and
 
 ## Install
 
-Download the `.dmg` (Apple Silicon) from [Releases](https://github.com/BugenZhao/kimi-lite/releases) and drag Kimi Lite to Applications.
-
-The app is not notarized yet, so macOS blocks the first launch. Either open it from **System Settings → Privacy & Security → Open Anyway**, or clear the quarantine flag:
-
-```sh
-xattr -dr com.apple.quarantine "/Applications/Kimi Lite.app"
-```
+Download the `.dmg` (Apple Silicon) from [Releases](https://github.com/BugenZhao/kimi-lite/releases) and drag Kimi Lite to Applications. Releases are signed with a Developer ID and notarized by Apple.
 
 ### Build from source
 
